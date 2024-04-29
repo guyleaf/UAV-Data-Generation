@@ -10,4 +10,4 @@ mamba install -y -c "nvidia/label/cuda-11.8.0" cuda-toolkit
 
 pip install torch torchvision --extra-index-url https://download.pytorch.org/whl/cu118
 
-pip install -r requirements.txt
+pip install -U -r requirements.txt
