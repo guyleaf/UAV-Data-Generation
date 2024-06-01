@@ -1,8 +1,8 @@
-diffusers[torch]
-transformers
+diffusers[torch] < 5.0.0
+transformers < 5.0.0
 controlnet-aux
 ipywidgets
 ipykernel
 invisible-watermark
-opencv-python-headless
+opencv-python-headless < 5.0.0.0
 compel
