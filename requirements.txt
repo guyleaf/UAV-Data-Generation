@@ -1,2 +1,8 @@
 diffusers[torch]
 transformers
+controlnet-aux
+ipywidgets
+ipykernel
+invisible-watermark
+opencv-python-headless
+compel
