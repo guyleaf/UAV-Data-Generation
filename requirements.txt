@@ -6,3 +6,7 @@ ipykernel
 invisible-watermark
 opencv-python-headless < 5.0.0.0
 compel
+pycocotools
+matplotlib
+pandas
+fastdup
