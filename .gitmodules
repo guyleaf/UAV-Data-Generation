@@ -1,0 +1,3 @@
+[submodule "libcom"]
+	path = libcom
+	url = https://github.com/bcmi/libcom.git
