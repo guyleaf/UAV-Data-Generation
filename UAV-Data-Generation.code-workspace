@@ -7,10 +7,19 @@
 			"path": "../../work/work_dirs"
 		},
 		{
-				"path": "../../work/experiments"
+			"path": "../../work/experiments"
 		},
 		{
-				"path": "../../data/checkpoints"
+			"path": "../../data/checkpoints"
+		},
+		{
+			"path": "../IC-Light"
+		},
+		{
+			"path": "../PIH"
+		},
+		{
+			"path": "../AnyDoor"
 		}
 	]
 }
