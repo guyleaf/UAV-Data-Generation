@@ -9,4 +9,6 @@ compel
 pycocotools
 matplotlib
 pandas
-fastdup
+fastdup; sys_platform != "win32"
+bpy == 3.5.1
+blenderproc < 3.0.0
