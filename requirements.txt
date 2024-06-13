@@ -10,5 +10,5 @@ pycocotools
 matplotlib
 pandas
 fastdup; sys_platform != "win32"
-bpy == 3.5.1
+bpy ~= 3.5.0
 blenderproc < 3.0.0
