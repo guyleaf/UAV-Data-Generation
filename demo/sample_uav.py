@@ -120,10 +120,10 @@ def sample_uav(
 ):
     objs, uav_models = setup(scene_path, device_type, device)
 
-    # hide all uav components and set categorid_id to 0 as drone category
+    # hide all uav components and set categorid_id to 1 as drone category
     for uav_components in uav_models.values():
         for uav_component in uav_components:
-            uav_component.set_cp("category_id", 0)
+            uav_component.set_cp("category_id", 1)
             uav_component.hide()
 
     for i, (name, uav_components) in enumerate(uav_models.items()):
@@ -168,10 +168,7 @@ def sample_uav(
 
         # activate normal rendering
         bproc.renderer.enable_normals_output()
-        bproc.renderer.enable_segmentation_output(
-            map_by=["category_id"],
-            default_values=dict(category_id=-1),
-        )
+        bproc.renderer.enable_segmentation_output(map_by="category_id")
 
         # render the whole pipeline
         data = bproc.renderer.render()
