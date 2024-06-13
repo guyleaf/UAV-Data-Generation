@@ -20,6 +20,9 @@
 		},
 		{
 			"path": "../AnyDoor"
+		},
+		{
+			"path": "../../archive"
 		}
 	]
 }
