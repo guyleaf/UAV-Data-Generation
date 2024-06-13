@@ -2,11 +2,13 @@ import blenderproc as bproc  # isort:skip, this should be at the top due to the 
 
 import argparse
 import os
+from collections import defaultdict
 from typing import Any
 
 import bpy
 import numpy as np
 from blenderproc.python.renderer import RendererUtility
+from blenderproc.python.types.EntityUtility import Entity
 
 
 def parse_args():
@@ -22,7 +24,7 @@ def parse_args():
     )
     parser.add_argument(
         "--samples",
-        default=3,
+        default=60,
         type=int,
         help="The number of times the objects should be animated and rendered.",
     )
@@ -85,7 +87,7 @@ def setup(scene_path: str, device_type: str, device: int):
 
     # Setup scene settingss
     bpy.context.scene.render.fps = 30
-    bproc.camera.set_resolution(1920, 1080)
+    bproc.camera.set_resolution(512, 512)
 
     # find UAV collection
     uav_collection = find_collection_by_attr(collections, "name", "UAVs")
@@ -95,9 +97,18 @@ def setup(scene_path: str, device_type: str, device: int):
     )
 
     pattern = "|".join(uav_names)
-    uav_objs = bproc.filter.by_attr(objs, "name", f"^({pattern}).*", regex=True)
-    assert len(uav_objs) > 0, "UAV object is not found."
-    return objs, uav_objs
+    uav_objs: list[Entity] = bproc.filter.by_attr(
+        objs, "name", f"^({pattern})\.001$", regex=True
+    )
+
+    # organize components for each uav model as dict
+    uav_models = defaultdict[str, list[Entity]](list)
+    for obj in uav_objs:
+        uav_name = obj.get_name().split(".")[0]
+        uav_models[uav_name] += [obj] + obj.get_children(return_all_offspring=True)
+
+    assert len(uav_models) > 0, "UAV model is not found."
+    return objs, uav_models
 
 
 def sample_uav(
@@ -107,66 +118,77 @@ def sample_uav(
     device_type: str = "OPTIX",
     device: int = 0,
 ):
-    objs, uav_objs = setup(scene_path, device_type, device)
+    objs, uav_models = setup(scene_path, device_type, device)
 
-    for uav_obj in uav_objs:
-        uav_obj.set_cp("category_id", 0)
+    # hide all uav components and set categorid_id to 0 as drone category
+    for uav_components in uav_models.values():
+        for uav_component in uav_components:
+            uav_component.set_cp("category_id", 0)
+            uav_component.hide()
 
-    # Find point of interest, all cam poses should look towards it
-    poi = bproc.object.compute_poi(uav_objs)
+    for i, (name, uav_components) in enumerate(uav_models.items()):
+        print("\nUAV name:", name)
 
-    # Add translational random walk on top of the POI
-    poi_drift = bproc.sampler.random_walk(
-        total_length=samples,
-        dims=3,
-        step_magnitude=0.005,
-        window_size=5,
-        interval=[-0.03, 0.03],
-        distribution="uniform",
-    )
+        # show components of the current uav model
+        for uav_component in uav_components:
+            uav_component.hide(False)
 
-    for i in range(samples):
-        # print("\nSample:", i + 1)
+        # find point of interest, all cam poses should look towards it
+        poi = bproc.object.compute_poi(uav_components)
 
-        # bproc.utility.reset_keyframes()
+        # Add translational random walk on top of the POI
+        # poi_drift = bproc.sampler.random_walk(
+        #     total_length=samples,
+        #     dims=3,
+        #     step_magnitude=0.005,
+        #     window_size=5,
+        #     interval=[-0.03, 0.03],
+        #     distribution="uniform",
+        # )
 
-        # frame = random.randint(0, 100)
-        frame = i
-        # Camera trajectory that defines a quater circle at constant height
-        location_cam = np.array(
-            [
-                1 * np.cos(frame / samples * np.pi * 2),
-                1 * np.sin(frame / samples * np.pi * 2),
-                1,
-            ]
+        for frame in range(samples):
+            # Camera trajectory that defines a quater circle at constant height
+            location_cam = np.array(
+                [
+                    1 * np.cos(frame / samples * np.pi * 2),
+                    1 * np.sin(frame / samples * np.pi * 2),
+                    1,
+                ]
+            )
+            # Compute rotation based on vector going from location towards poi + drift
+            # rotation_matrix = bproc.camera.rotation_from_forward_vec(
+            #     poi + poi_drift[frame] - location_cam
+            # )
+            rotation_matrix = bproc.camera.rotation_from_forward_vec(poi - location_cam)
+            # Add homog cam pose based on location an rotation
+            cam2world_matrix = bproc.math.build_transformation_mat(
+                location_cam, rotation_matrix
+            )
+            bproc.camera.add_camera_pose(cam2world_matrix, frame=frame)
+
+        # activate normal rendering
+        bproc.renderer.enable_normals_output()
+        bproc.renderer.enable_segmentation_output(
+            map_by=["category_id"],
+            default_values=dict(category_id=-1),
         )
-        # Compute rotation based on vector going from location towards poi + drift
-        rotation_matrix = bproc.camera.rotation_from_forward_vec(
-            poi + poi_drift[i] - location_cam
+
+        # render the whole pipeline
+        data = bproc.renderer.render()
+
+        # write the data to a .hdf5 container in the run-specific output directory
+        bproc.writer.write_gif_animation(
+            out_dir,
+            data,
+            frame_duration_in_ms=round(1 / bpy.context.scene.render.fps),
+            append_to_existing_output=True,
         )
-        # Add homog cam pose based on location an rotation
-        cam2world_matrix = bproc.math.build_transformation_mat(
-            location_cam, rotation_matrix
-        )
-        bproc.camera.add_camera_pose(cam2world_matrix, frame=frame)
 
-        # bproc.utility.set_keyframe_render_interval(frame_start=frame)
+        # hide current components for next rendering
+        for uav_component in uav_components:
+            uav_component.hide()
 
-    # activate normal rendering
-    bproc.renderer.enable_normals_output()
-    bproc.renderer.enable_segmentation_output(
-        map_by=["category_id"], default_values=dict(category_id=-1)
-    )
-
-    # render the whole pipeline
-    data = bproc.renderer.render()
-
-    # write the data to a .hdf5 container in the run-specific output directory
-    bproc.writer.write_gif_animation(
-        out_dir,
-        data,
-        frame_duration_in_ms=round(1 / bpy.context.scene.render.fps),
-    )
+        bproc.utility.reset_keyframes()
 
 
 if __name__ == "__main__":
