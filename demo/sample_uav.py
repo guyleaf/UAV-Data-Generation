@@ -3,7 +3,7 @@ import blenderproc as bproc  # isort:skip, this should be at the top due to the 
 import argparse
 import os
 from collections import defaultdict
-from typing import Any
+from typing import Any, Optional
 
 import bpy
 import numpy as np
@@ -22,6 +22,7 @@ def parse_args():
         default="outputs",
         help="Path to where the final files, will be saved",
     )
+    parser.add_argument("--models", type=str, nargs="+", default=None)
     parser.add_argument(
         "--samples",
         default=60,
@@ -113,6 +114,7 @@ def setup(scene_path: str, device_type: str, device: int):
 
 def sample_uav(
     scene_path: str,
+    models: Optional[list[str]] = None,
     out_dir: str = "outputs",
     samples: int = 3,
     device_type: str = "OPTIX",
@@ -120,11 +122,14 @@ def sample_uav(
 ):
     objs, uav_models = setup(scene_path, device_type, device)
 
-    # hide all uav components and set categorid_id to 1 as drone category
+    # hide all uav components and set categorid_id to 0 as drone category
     for uav_components in uav_models.values():
         for uav_component in uav_components:
-            uav_component.set_cp("category_id", 1)
+            uav_component.set_cp("category_id", 0)
             uav_component.hide()
+
+    if models is not None:
+        uav_models = {name: uav_models[name] for name in models}
 
     for i, (name, uav_components) in enumerate(uav_models.items()):
         print("\nUAV name:", name)
@@ -168,14 +173,16 @@ def sample_uav(
 
         # activate normal rendering
         bproc.renderer.enable_normals_output()
-        bproc.renderer.enable_segmentation_output(map_by="category_id")
+        bproc.renderer.enable_segmentation_output(
+            map_by="category_id", default_values=dict(category_id=-1)
+        )
 
         # render the whole pipeline
         data = bproc.renderer.render()
 
         # write the data to a .hdf5 container in the run-specific output directory
         bproc.writer.write_gif_animation(
-            out_dir,
+            os.path.join(out_dir, name),
             data,
             frame_duration_in_ms=round(1 / bpy.context.scene.render.fps),
             append_to_existing_output=True,
@@ -193,6 +200,7 @@ if __name__ == "__main__":
     os.environ["BLENDER_PROC_RANDOM_SEED"] = str(args.seed)
     sample_uav(
         args.scene_path,
+        models=args.models,
         out_dir=args.out_dir,
         samples=args.samples,
         device_type=args.device_type,
