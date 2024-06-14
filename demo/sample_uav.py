@@ -73,11 +73,15 @@ def setup(scene_path: str, device_type: str, device: int):
 
     # set render device
     use_only_cpu = device_type == "CPU"
+    device_type = device_type if not use_only_cpu else None
     RendererUtility.set_render_devices(
         use_only_cpu=use_only_cpu,
         desired_gpu_device_type=device_type if not use_only_cpu else None,
         desired_gpu_ids=device,
     )
+
+    if device_type == "OPTIX":
+        RendererUtility.set_denoiser(device_type)
 
     # load collections to get UAV names
     collections = bproc.loader.load_blend(scene_path, data_blocks="collections")
