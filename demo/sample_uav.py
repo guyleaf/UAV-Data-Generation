@@ -8,7 +8,7 @@ from typing import Any, Optional
 import bpy
 import numpy as np
 from blenderproc.python.renderer import RendererUtility
-from blenderproc.python.types.EntityUtility import Entity
+from blenderproc.python.types.MeshObjectUtility import MeshObject
 
 
 def parse_args():
@@ -102,12 +102,12 @@ def setup(scene_path: str, device_type: str, device: int):
     )
 
     pattern = "|".join(uav_names)
-    uav_objs: list[Entity] = bproc.filter.by_attr(
+    uav_objs: list[MeshObject] = bproc.filter.by_attr(
         objs, "name", f"^({pattern})\.001$", regex=True
     )
 
     # organize components for each uav model as dict
-    uav_models = defaultdict[str, list[Entity]](list)
+    uav_models: dict[str, list[MeshObject]] = defaultdict(list)
     for obj in uav_objs:
         uav_name = obj.get_name().split(".")[0]
         uav_models[uav_name] += [obj] + obj.get_children(return_all_offspring=True)
