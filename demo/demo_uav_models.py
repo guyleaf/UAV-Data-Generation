@@ -7,8 +7,7 @@ from typing import Any, Optional
 
 import bpy
 import numpy as np
-from blenderproc.python.renderer import RendererUtility
-from blenderproc.python.types.MeshObjectUtility import MeshObject
+from blenderproc.api.types import MeshObject
 
 
 def parse_args():
@@ -16,6 +15,12 @@ def parse_args():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument("scene_path", type=str, help="Path to the .blend scene file")
+    parser.add_argument(
+        "--background_path",
+        type=str,
+        default=None,
+        help="Path to the background HDRI file",
+    )
     parser.add_argument(
         "--out_dir",
         type=str,
@@ -42,10 +47,11 @@ def parse_args():
         help="The GPU device type for rendering. Possible choices are [CPU, OPTIX, CUDA, METAL, HIP]",
     )
     parser.add_argument(
-        "--device",
-        default=0,
+        "--devices",
+        default=[0],
         type=int,
-        help="The GPU device id for rendering. You can check the id by executing list_gpu_devices.py",
+        nargs="+",
+        help="The GPU device ids for rendering. You can check the id by executing list_gpu_devices.py",
     )
 
     args = parser.parse_args()
@@ -68,20 +74,25 @@ def find_collection_by_attr(
     return collections[0]
 
 
-def setup(scene_path: str, device_type: str, device: int):
+def setup(
+    scene_path: str,
+    background_path: Optional[str],
+    device_type: str,
+    devices: list[int],
+):
     bproc.init()
 
     # set render device
     use_only_cpu = device_type == "CPU"
     device_type = device_type if not use_only_cpu else None
-    RendererUtility.set_render_devices(
+    bproc.renderer.set_render_devices(
         use_only_cpu=use_only_cpu,
         desired_gpu_device_type=device_type if not use_only_cpu else None,
-        desired_gpu_ids=device,
+        desired_gpu_ids=devices,
     )
 
     if device_type == "OPTIX":
-        RendererUtility.set_denoiser(device_type)
+        bproc.renderer.set_denoiser(device_type)
 
     # load collections to get UAV names
     collections = bproc.loader.load_blend(scene_path, data_blocks="collections")
@@ -92,7 +103,13 @@ def setup(scene_path: str, device_type: str, device: int):
 
     # Setup scene settingss
     bpy.context.scene.render.fps = 30
-    bproc.camera.set_resolution(512, 512)
+    bproc.camera.set_resolution(1920, 1080)
+    bproc.renderer.set_output_format(enable_transparency=True)
+    # bproc.renderer.set_max_amount_of_samples(4096)
+
+    if background_path is not None:
+        print("Loading the background:", os.path.basename(background_path))
+        bproc.world.set_world_background_hdr_img(background_path)
 
     # find UAV collection
     uav_collection = find_collection_by_attr(collections, "name", "UAVs")
@@ -118,18 +135,19 @@ def setup(scene_path: str, device_type: str, device: int):
 
 def sample_uav(
     scene_path: str,
+    background_path: Optional[str] = None,
     models: Optional[list[str]] = None,
     out_dir: str = "outputs",
     samples: int = 3,
     device_type: str = "OPTIX",
-    device: int = 0,
+    devices: list[int] = [0],
 ):
-    objs, uav_models = setup(scene_path, device_type, device)
+    objs, uav_models = setup(scene_path, background_path, device_type, devices)
 
     # hide all uav components and set categorid_id to 0 as drone category
     for uav_components in uav_models.values():
         for uav_component in uav_components:
-            uav_component.set_cp("category_id", 0)
+            uav_component.set_cp("category_id", 1)
             uav_component.hide()
 
     if models is not None:
@@ -159,9 +177,9 @@ def sample_uav(
             # Camera trajectory that defines a quater circle at constant height
             location_cam = np.array(
                 [
-                    1 * np.cos(frame / samples * np.pi * 2),
-                    1 * np.sin(frame / samples * np.pi * 2),
-                    1,
+                    0.5 * np.cos(frame / samples * np.pi * 2),
+                    0.5 * np.sin(frame / samples * np.pi * 2),
+                    0.8,
                 ]
             )
             # Compute rotation based on vector going from location towards poi + drift
@@ -178,7 +196,7 @@ def sample_uav(
         # activate normal rendering
         bproc.renderer.enable_normals_output()
         bproc.renderer.enable_segmentation_output(
-            map_by="category_id", default_values=dict(category_id=-1)
+            map_by="category_id", default_values=dict(category_id=0)
         )
 
         # render the whole pipeline
@@ -204,9 +222,10 @@ if __name__ == "__main__":
     os.environ["BLENDER_PROC_RANDOM_SEED"] = str(args.seed)
     sample_uav(
         args.scene_path,
+        background_path=args.background_path,
         models=args.models,
         out_dir=args.out_dir,
         samples=args.samples,
         device_type=args.device_type,
-        device=args.device,
+        devices=args.devices,
     )
