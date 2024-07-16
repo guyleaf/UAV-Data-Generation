@@ -3,7 +3,7 @@ import blenderproc as bproc  # isort:skip, this should be at the top due to the 
 import argparse
 import os
 from collections import defaultdict
-from typing import Any, Optional
+from typing import Optional
 
 import bpy
 import numpy as np
@@ -59,21 +59,6 @@ def parse_args():
     return args
 
 
-def find_collection_by_attr(
-    collections: list[bpy.types.Collection], attr_name: str, value: Any
-):
-    collections = list(
-        filter(lambda collection: getattr(collection, attr_name) == value, collections)
-    )
-    if len(collections) > 1:
-        raise Exception(
-            "More than one collection with the given condition has been found."
-        )
-    if len(collections) == 0:
-        raise Exception("No collection with the given condition has been found.")
-    return collections[0]
-
-
 def setup(
     scene_path: str,
     background_path: Optional[str],
@@ -94,9 +79,6 @@ def setup(
     if device_type == "OPTIX":
         bproc.renderer.set_denoiser(device_type)
 
-    # load collections to get UAV names
-    collections = bproc.loader.load_blend(scene_path, data_blocks="collections")
-
     # note: only objects in the obj_types can be loaded
     # otherwise, such as scene settings, they aren't loaded by blenderprc
     objs = bproc.loader.load_blend(scene_path, obj_types=["mesh", "light", "camera"])
@@ -111,22 +93,13 @@ def setup(
         print("Loading the background:", os.path.basename(background_path))
         bproc.world.set_world_background_hdr_img(background_path)
 
-    # find UAV collection
-    uav_collection = find_collection_by_attr(collections, "name", "UAVs")
-    # nested objects always have at least one comma
-    uav_names = list(
-        filter(lambda name: name.count(".") == 0, uav_collection.objects.keys())
-    )
-
-    pattern = "|".join(uav_names)
-    uav_objs: list[MeshObject] = bproc.filter.by_attr(
-        objs, "name", f"^({pattern})\.001$", regex=True
-    )
+    # collect UAV models by custom property
+    uav_objs = bproc.filter.by_cp(objs, "UAV_model", True)
 
     # organize components for each uav model as dict
     uav_models: dict[str, list[MeshObject]] = defaultdict(list)
     for obj in uav_objs:
-        uav_name = obj.get_name().split(".")[0]
+        uav_name = obj.get_name()
         uav_models[uav_name] += [obj] + obj.get_children(return_all_offspring=True)
 
     assert len(uav_models) > 0, "UAV model is not found."
