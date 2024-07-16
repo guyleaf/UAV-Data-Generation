@@ -106,6 +106,25 @@ def setup(
     return objs, uav_models
 
 
+def reset_keyframes(original_action_keys: list[str]) -> None:
+    """Removes registered keyframes from all objects which are not in original_action_keys and resets frame_start and frame_end"""
+    bpy.context.scene.frame_start = 0
+    bpy.context.scene.frame_end = 0
+
+    # clear all camera poses among keyframes
+    tbd_action_keys = set(bpy.data.actions.keys()) - set(original_action_keys)
+    for action_key in tbd_action_keys:
+        action = bpy.data.actions[action_key]
+        bpy.data.actions.remove(action)
+
+
+def get_cp(object: MeshObject, key: str, default=None):
+    if object.has_cp(key):
+        return object.get_cp(key)
+    else:
+        return default
+
+
 def sample_uav(
     scene_path: str,
     background_path: Optional[str] = None,
@@ -126,12 +145,14 @@ def sample_uav(
     if models is not None:
         uav_models = {name: uav_models[name] for name in models}
 
+    original_action_keys = bpy.data.actions.keys()
     for i, (name, uav_components) in enumerate(uav_models.items()):
         print("\nUAV name:", name)
 
         # show components of the current uav model
         for uav_component in uav_components:
-            uav_component.hide(False)
+            visibility = get_cp(uav_component, "visibility", default=True)
+            uav_component.hide(not visibility)
 
         # find point of interest, all cam poses should look towards it
         poi = bproc.object.compute_poi(uav_components)
@@ -166,8 +187,7 @@ def sample_uav(
             )
             bproc.camera.add_camera_pose(cam2world_matrix, frame=frame)
 
-        # activate normal rendering
-        bproc.renderer.enable_normals_output()
+        # activate segment rendering
         bproc.renderer.enable_segmentation_output(
             map_by="category_id", default_values=dict(category_id=0)
         )
@@ -187,7 +207,8 @@ def sample_uav(
         for uav_component in uav_components:
             uav_component.hide()
 
-        bproc.utility.reset_keyframes()
+        # reset keyframes
+        reset_keyframes(original_action_keys)
 
 
 if __name__ == "__main__":
