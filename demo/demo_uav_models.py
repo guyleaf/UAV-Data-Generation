@@ -8,6 +8,7 @@ from typing import Optional
 import bpy
 import numpy as np
 from blenderproc.api.types import MeshObject
+from mathutils import Matrix
 
 
 def parse_args():
@@ -16,9 +17,8 @@ def parse_args():
     )
     parser.add_argument("scene_path", type=str, help="Path to the .blend scene file")
     parser.add_argument(
-        "--background_path",
+        "background_path",
         type=str,
-        default=None,
         help="Path to the background HDRI file",
     )
     parser.add_argument(
@@ -61,7 +61,7 @@ def parse_args():
 
 def setup(
     scene_path: str,
-    background_path: Optional[str],
+    background_path: str,
     device_type: str,
     devices: list[int],
 ):
@@ -76,22 +76,19 @@ def setup(
         desired_gpu_ids=devices,
     )
 
-    if device_type == "OPTIX":
-        bproc.renderer.set_denoiser(device_type)
-
     # note: only objects in the obj_types can be loaded
     # otherwise, such as scene settings, they aren't loaded by blenderprc
-    objs = bproc.loader.load_blend(scene_path, obj_types=["mesh", "light", "camera"])
+    objs = bproc.loader.load_blend(scene_path, obj_types=["mesh", "light"])
 
     # Setup scene settingss
-    bpy.context.scene.render.fps = 30
+    bpy.context.scene.render.fps = 60
     bproc.camera.set_resolution(1920, 1080)
     bproc.renderer.set_output_format(enable_transparency=True)
     # bproc.renderer.set_max_amount_of_samples(4096)
+    bproc.renderer.enable_motion_blur(motion_blur_length=0.5)
 
-    if background_path is not None:
-        print("Loading the background:", os.path.basename(background_path))
-        bproc.world.set_world_background_hdr_img(background_path)
+    print("Loading the background:", os.path.basename(background_path))
+    bproc.world.set_world_background_hdr_img(background_path)
 
     # collect UAV models by custom property
     uav_objs = bproc.filter.by_cp(objs, "UAV_model", True)
@@ -103,6 +100,7 @@ def setup(
         uav_models[uav_name] += [obj] + obj.get_children(return_all_offspring=True)
 
     assert len(uav_models) > 0, "UAV model is not found."
+    print("Find", len(uav_models), "UAV models")
     return objs, uav_models
 
 
@@ -125,9 +123,9 @@ def get_cp(object: MeshObject, key: str, default=None):
         return default
 
 
-def sample_uav(
+def demo_uav_models(
     scene_path: str,
-    background_path: Optional[str] = None,
+    background_path: str,
     models: Optional[list[str]] = None,
     out_dir: str = "outputs",
     samples: int = 3,
@@ -146,7 +144,7 @@ def sample_uav(
         uav_models = {name: uav_models[name] for name in models}
 
     original_action_keys = bpy.data.actions.keys()
-    for i, (name, uav_components) in enumerate(uav_models.items()):
+    for i, (name, (uav_model, *uav_components)) in enumerate(uav_models.items()):
         print("\nUAV name:", name)
 
         # show components of the current uav model
@@ -167,6 +165,12 @@ def sample_uav(
         #     distribution="uniform",
         # )
 
+        # Select current UAV model
+        bpy.ops.object.select_all(action="DESELECT")
+        bpy.context.view_layer.objects.active = uav_model.blender_obj
+        uav_model.select()
+        bpy.ops.object.select_hierarchy(direction="CHILD", extend=True)
+
         for frame in range(samples):
             # Camera trajectory that defines a quater circle at constant height
             location_cam = np.array(
@@ -185,6 +189,15 @@ def sample_uav(
             cam2world_matrix = bproc.math.build_transformation_mat(
                 location_cam, rotation_matrix
             )
+
+            # Align the camera view to fit UAV
+            print(cam2world_matrix)
+            camera = bpy.context.scene.camera
+            camera.matrix_world = Matrix(cam2world_matrix)
+            bpy.ops.view3d.camera_to_view_selected()
+            cam2world_matrix = camera.matrix_world
+            print(cam2world_matrix)
+
             bproc.camera.add_camera_pose(cam2world_matrix, frame=frame)
 
         # activate segment rendering
@@ -199,7 +212,7 @@ def sample_uav(
         bproc.writer.write_gif_animation(
             os.path.join(out_dir, name),
             data,
-            frame_duration_in_ms=round(1 / bpy.context.scene.render.fps),
+            # frame_duration_in_ms=round(1 / bpy.context.scene.render.fps),
             append_to_existing_output=True,
         )
 
@@ -214,9 +227,9 @@ def sample_uav(
 if __name__ == "__main__":
     args = parse_args()
     os.environ["BLENDER_PROC_RANDOM_SEED"] = str(args.seed)
-    sample_uav(
+    demo_uav_models(
         args.scene_path,
-        background_path=args.background_path,
+        args.background_path,
         models=args.models,
         out_dir=args.out_dir,
         samples=args.samples,
