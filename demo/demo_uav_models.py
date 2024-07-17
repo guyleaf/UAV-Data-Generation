@@ -8,7 +8,7 @@ from typing import Optional
 import bpy
 import numpy as np
 from blenderproc.api.types import MeshObject
-from mathutils import Matrix
+from mathutils import Matrix, Vector
 
 
 def parse_args():
@@ -82,10 +82,10 @@ def setup(
 
     # Setup scene settingss
     bpy.context.scene.render.fps = 60
-    bproc.camera.set_resolution(1920, 1080)
+    bproc.camera.set_resolution(3840, 3840)
     bproc.renderer.set_output_format(enable_transparency=True)
     # bproc.renderer.set_max_amount_of_samples(4096)
-    bproc.renderer.enable_motion_blur(motion_blur_length=0.5)
+    # bproc.renderer.enable_motion_blur(motion_blur_length=0.5)
 
     print("Loading the background:", os.path.basename(background_path))
     bproc.world.set_world_background_hdr_img(background_path)
@@ -144,7 +144,7 @@ def demo_uav_models(
         uav_models = {name: uav_models[name] for name in models}
 
     original_action_keys = bpy.data.actions.keys()
-    for i, (name, (uav_model, *uav_components)) in enumerate(uav_models.items()):
+    for i, (name, uav_components) in enumerate(uav_models.items()):
         print("\nUAV name:", name)
 
         # show components of the current uav model
@@ -155,7 +155,7 @@ def demo_uav_models(
         # find point of interest, all cam poses should look towards it
         poi = bproc.object.compute_poi(uav_components)
 
-        # Add translational random walk on top of the POI
+        # add translational random walk on top of the POI
         # poi_drift = bproc.sampler.random_walk(
         #     total_length=samples,
         #     dims=3,
@@ -165,38 +165,54 @@ def demo_uav_models(
         #     distribution="uniform",
         # )
 
-        # Select current UAV model
+        # select current UAV model
         bpy.ops.object.select_all(action="DESELECT")
+        uav_model = uav_components[0]
         bpy.context.view_layer.objects.active = uav_model.blender_obj
         uav_model.select()
         bpy.ops.object.select_hierarchy(direction="CHILD", extend=True)
 
         for frame in range(samples):
-            # Camera trajectory that defines a quater circle at constant height
+            # set the current frame in order to get the correct animtation to let the camera fit the object
+            bpy.context.scene.frame_set(frame)
+
+            # 1. determine the location of camera
+            # camera trajectory that defines a quater circle at constant height
             location_cam = np.array(
                 [
-                    0.5 * np.cos(frame / samples * np.pi * 2),
-                    0.5 * np.sin(frame / samples * np.pi * 2),
-                    0.8,
+                    1 * np.cos(frame / samples * np.pi * 2),
+                    1 * np.sin(frame / samples * np.pi * 2),
+                    0,
                 ]
             )
-            # Compute rotation based on vector going from location towards poi + drift
+            # compute rotation based on vector going from location towards poi + drift
             # rotation_matrix = bproc.camera.rotation_from_forward_vec(
             #     poi + poi_drift[frame] - location_cam
             # )
             rotation_matrix = bproc.camera.rotation_from_forward_vec(poi - location_cam)
-            # Add homog cam pose based on location an rotation
+            # add homog cam pose based on location and rotation
             cam2world_matrix = bproc.math.build_transformation_mat(
                 location_cam, rotation_matrix
             )
 
-            # Align the camera view to fit UAV
-            print(cam2world_matrix)
+            # 2. align the camera view to fit UAV
             camera = bpy.context.scene.camera
             camera.matrix_world = Matrix(cam2world_matrix)
             bpy.ops.view3d.camera_to_view_selected()
-            cam2world_matrix = camera.matrix_world
-            print(cam2world_matrix)
+
+            # 3. move the camera -0.1m along local Z-axis (0, 0, 1)
+            move_amount = 0.05
+
+            # by default, the forward (tracking) axis is -Z (camera) in blender.
+            # so, we just take the Z-axis. (move backward)
+            backward_vector = Vector((0, 0, move_amount))
+
+            # transform local vector to global vector by rotation matrix (ignore scale)
+            backward_vector = camera.rotation_euler.to_matrix() @ backward_vector
+
+            # translate location
+            # it is equivalent to `camera.location += backward_vector; bpy.context.view_layer.update(); cam2world_matrix = camera.matrix_world`
+            cam2world_matrix = Matrix.Translation(backward_vector) @ camera.matrix_world
 
             bproc.camera.add_camera_pose(cam2world_matrix, frame=frame)
 
@@ -212,9 +228,10 @@ def demo_uav_models(
         bproc.writer.write_gif_animation(
             os.path.join(out_dir, name),
             data,
-            # frame_duration_in_ms=round(1 / bpy.context.scene.render.fps),
+            frame_duration_in_ms=round(1000 / bpy.context.scene.render.fps),
             append_to_existing_output=True,
         )
+        # bproc.writer.write_hdf5(os.path.join(out_dir, name), data)
 
         # hide current components for next rendering
         for uav_component in uav_components:
