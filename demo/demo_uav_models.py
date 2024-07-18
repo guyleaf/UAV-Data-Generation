@@ -203,8 +203,8 @@ def demo_uav_models(
             # 3. move the camera -0.1m along local Z-axis (0, 0, 1)
             move_amount = 0.05
 
-            # by default, the forward (tracking) axis is -Z (camera) in blender.
-            # so, we just take the Z-axis. (move backward)
+            # by default, the camera view direction is local -Z axis in blender.
+            # so, we just take the local Z-axis. (move backward)
             backward_vector = Vector((0, 0, move_amount))
 
             # transform local vector to global vector by rotation matrix (ignore scale)
