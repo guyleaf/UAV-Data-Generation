@@ -2,13 +2,16 @@ import blenderproc as bproc  # isort:skip, this should be at the top due to the 
 
 import argparse
 import os
-from collections import defaultdict
+import sys
 from typing import Optional
 
 import bpy
 import numpy as np
-from blenderproc.api.types import MeshObject
 from mathutils import Matrix, Vector
+
+sys.path.append(os.path.dirname(__file__))
+
+from utils import get_cp, reset_keyframes, setup
 
 
 def parse_args():
@@ -57,70 +60,6 @@ def parse_args():
     args = parser.parse_args()
     assert args.scene_path.endswith(".blend") and os.path.isfile(args.scene_path)
     return args
-
-
-def setup(
-    scene_path: str,
-    background_path: str,
-    device_type: str,
-    devices: list[int],
-):
-    bproc.init()
-
-    # set render device
-    use_only_cpu = device_type == "CPU"
-    device_type = device_type if not use_only_cpu else None
-    bproc.renderer.set_render_devices(
-        use_only_cpu=use_only_cpu,
-        desired_gpu_device_type=device_type if not use_only_cpu else None,
-        desired_gpu_ids=devices,
-    )
-
-    # note: only objects in the obj_types can be loaded
-    # otherwise, such as scene settings, they aren't loaded by blenderprc
-    objs = bproc.loader.load_blend(scene_path, obj_types=["mesh", "light"])
-
-    # Setup scene settingss
-    bpy.context.scene.render.fps = 60
-    bproc.camera.set_resolution(3840, 3840)
-    bproc.renderer.set_output_format(enable_transparency=True)
-    # bproc.renderer.set_max_amount_of_samples(4096)
-    # bproc.renderer.enable_motion_blur(motion_blur_length=0.5)
-
-    print("Loading the background:", os.path.basename(background_path))
-    bproc.world.set_world_background_hdr_img(background_path)
-
-    # collect UAV models by custom property
-    uav_objs = bproc.filter.by_cp(objs, "UAV_model", True)
-
-    # organize components for each uav model as dict
-    uav_models: dict[str, list[MeshObject]] = defaultdict(list)
-    for obj in uav_objs:
-        uav_name = obj.get_name()
-        uav_models[uav_name] += [obj] + obj.get_children(return_all_offspring=True)
-
-    assert len(uav_models) > 0, "UAV model is not found."
-    print("Find", len(uav_models), "UAV models")
-    return objs, uav_models
-
-
-def reset_keyframes(original_action_keys: list[str]) -> None:
-    """Removes registered keyframes from all objects which are not in original_action_keys and resets frame_start and frame_end"""
-    bpy.context.scene.frame_start = 0
-    bpy.context.scene.frame_end = 0
-
-    # clear all camera poses among keyframes
-    tbd_action_keys = set(bpy.data.actions.keys()) - set(original_action_keys)
-    for action_key in tbd_action_keys:
-        action = bpy.data.actions[action_key]
-        bpy.data.actions.remove(action)
-
-
-def get_cp(object: MeshObject, key: str, default=None):
-    if object.has_cp(key):
-        return object.get_cp(key)
-    else:
-        return default
 
 
 def demo_uav_models(
