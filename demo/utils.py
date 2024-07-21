@@ -24,6 +24,9 @@ def setup(
     device_type: str,
     devices: list[int],
     motion_blur: bool = False,
+    resolution: tuple[int, int] = (1920, 1920),
+    max_samples: int = 1024,
+    tile_size: int = 1024,
 ):
     bproc.init()
 
@@ -36,6 +39,12 @@ def setup(
         desired_gpu_ids=devices,
     )
 
+    # WORKAROUND: currently, the blenderproc api doesn't support enabling OpenImageDenoise
+    bproc.renderer.set_denoiser(None)
+    bpy.context.scene.cycles.use_denoising = True
+    bpy.context.view_layer.cycles.use_denoising = True
+    bpy.context.scene.cycles.denoiser = "OPENIMAGEDENOISE"
+
     print("\nLoading the background:", os.path.basename(background_path))
     bproc.world.set_world_background_hdr_img(background_path)
 
@@ -47,9 +56,10 @@ def setup(
 
     # Setup scene settingss
     bpy.context.scene.render.fps = 60
-    bproc.camera.set_resolution(1920, 1920)
+    bproc.camera.set_resolution(*resolution)
     bproc.renderer.set_output_format(enable_transparency=True)
-    # bproc.renderer.set_max_amount_of_samples(4096)
+    bproc.renderer.set_max_amount_of_samples(max_samples)
+    bpy.context.scene.cycles.tile_size = tile_size
 
     if motion_blur:
         bproc.renderer.enable_motion_blur(motion_blur_length=0.5)
@@ -83,7 +93,7 @@ def get_cp(object: MeshObject, key: str, default=None):
         return default
 
 
-def reset_keyframes(original_action_keys: list[str]) -> None:
+def reset_keyframes(original_action_keys: list[str] = []) -> None:
     """Removes registered keyframes from all objects which are not in original_action_keys and resets frame_start and frame_end"""
     bpy.context.scene.frame_start = 0
     bpy.context.scene.frame_end = 0
