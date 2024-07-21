@@ -1,6 +1,5 @@
 import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the top due to the check of blenderproc
 import bpy  # noqa: F401 # isort:skip
-
 import argparse
 import os
 import random
@@ -9,10 +8,12 @@ from collections import defaultdict
 from math import radians
 from typing import Optional
 
+import idprop
 import numpy as np
 from blenderproc.python.types.MaterialUtility import Material
 from blenderproc.python.types.MeshObjectUtility import MeshObject
 from mathutils import Euler, Vector
+from matplotlib import font_manager
 from PIL import Image, ImageDraw, ImageFont
 
 sys.path.append(os.path.dirname(__file__))
@@ -110,6 +111,8 @@ def group_and_filter_material_slots_by_cp(
 ) -> dict[str, list[tuple[MeshObject, int]]]:
     def get_cp_(obj: MeshObject, cp_name: str, default):
         cp_values = get_cp(obj, cp_name, default=default)
+        if isinstance(cp_values, idprop.types.IDPropertyArray):
+            cp_values = cp_values.to_list()
 
         # check the length of cp_values == num_slots
         num_slots = max(len(obj.blender_obj.material_slots), 1)
@@ -201,7 +204,8 @@ def draw_bounding_box(image: Image.Image, coord: tuple[int, int, int, int]):
     draw.rectangle(coord, outline="red")
 
     text = f"Object size: {size:,}"
-    font = ImageFont.truetype("arial.ttf", 36)
+    font_file = font_manager.findfont("arial")
+    font = ImageFont.truetype(font_file, 36)
     text_xy = list(coord[:2])
     text_coord = text_xy + list(draw.textbbox(text_xy, text=text, font=font)[2:])
 
@@ -263,7 +267,7 @@ def main(
             bproc.utility.set_keyframe_render_interval(frame_start=frame)
             data = bproc.renderer.render()
 
-            out_path = os.path.join(out_dir, name, str(i))
+            out_path = os.path.join(out_dir, name)
             os.makedirs(out_path, exist_ok=True)
 
             # write the color to a .png container in the run-specific output directory
@@ -278,10 +282,10 @@ def main(
 
             image = Image.fromarray(color, mode="RGBA")
             draw_bounding_box(image, [min_x, min_y, max_x, max_y])
-            image.save(os.path.join(out_path, f"{frame}.png"))
+            image.save(os.path.join(out_path, f"{i}_{frame}.png"))
 
             # write the data to a .hdf5 container in the run-specific output directory
-            bproc.writer.write_hdf5(out_path, data)
+            # bproc.writer.write_hdf5(out_path, data)
 
             # reset keyframes
             reset_keyframes(original_action_keys)
