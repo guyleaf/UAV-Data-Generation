@@ -1,7 +1,9 @@
+import glob
 import os
 import random
 from collections import defaultdict
 from math import radians
+from mimetypes import MimeTypes
 
 import blenderproc as bproc
 import bpy
@@ -88,14 +90,26 @@ def setup(
 
 
 def collect_materials_by_cp(
-    cp_name: str = "random_material",
+    cp_name: str = "random_material", cp_value: bool = True
 ) -> list[bproc.types.Material]:
     materials = bproc.material.collect_all()
     materials = bproc.filter.by_cp(
-        materials, cp_name, True, filtered_data_type=bproc.types.Material
+        materials, cp_name, cp_value, filtered_data_type=bproc.types.Material
     )
     print(f"Find {len(materials)} materials")
     return materials
+
+
+def collect_images(root_path: str):
+    mime_checker = MimeTypes()
+
+    def validate_file_type(path: str):
+        mime_type = mime_checker.guess_type(path)[0]
+        return mime_type is not None and "image" in mime_type
+
+    return list(
+        filter(validate_file_type, glob.iglob("**/*.*", root_dir=root_path, recursive=True))
+    )
 
 
 def get_cp(object: MeshObject, key: str, default=None):
@@ -163,7 +177,60 @@ def find_bbox_by_alpha(image: np.ndarray):
     assert image.shape[-1] == 4, "The color format should be in RGBA."
     y_indices, x_indices = image[..., -1].nonzero()
     min_x = np.amin(x_indices)
-    max_x = np.amax(x_indices)
+    max_x = np.amax(x_indices) + 1
     min_y = np.amin(y_indices)
-    max_y = np.amax(y_indices)
+    max_y = np.amax(y_indices) + 1
     return min_x, min_y, max_x, max_y
+
+
+# Copyright (c) OpenMMLab. All rights reserved.
+# Modified from https://github.com/open-mmlab/mmdetection/blob/cfd5d3a985b0249de009b67d04f37263e11cdf3d/mmdet/evaluation/functional/bbox_overlaps.py
+def bbox_overlaps(
+    bboxes1: np.ndarray,
+    bboxes2: np.ndarray,
+    mode: str = "iou",
+    eps: float = 1e-6,
+):
+    """Calculate the ious between each bbox of bboxes1 and bboxes2.
+
+    Args:
+        bboxes1 (ndarray): Shape (n, 4)
+        bboxes2 (ndarray): Shape (k, 4)
+        mode (str): IOU (intersection over union) or IOF (intersection
+            over foreground)
+
+    Returns:
+        ious (ndarray): Shape (n, k)
+    """
+
+    assert mode in ["iou", "iof"]
+
+    bboxes1 = bboxes1.astype(np.float32)
+    bboxes2 = bboxes2.astype(np.float32)
+    rows = bboxes1.shape[0]
+    cols = bboxes2.shape[0]
+    ious = np.zeros((rows, cols), dtype=np.float32)
+    if rows * cols == 0:
+        return ious
+    exchange = False
+    if bboxes1.shape[0] > bboxes2.shape[0]:
+        bboxes1, bboxes2 = bboxes2, bboxes1
+        ious = np.zeros((cols, rows), dtype=np.float32)
+        exchange = True
+    area1 = (bboxes1[:, 2] - bboxes1[:, 0]) * (bboxes1[:, 3] - bboxes1[:, 1])
+    area2 = (bboxes2[:, 2] - bboxes2[:, 0]) * (bboxes2[:, 3] - bboxes2[:, 1])
+    for i in range(bboxes1.shape[0]):
+        x_start = np.maximum(bboxes1[i, 0], bboxes2[:, 0])
+        y_start = np.maximum(bboxes1[i, 1], bboxes2[:, 1])
+        x_end = np.minimum(bboxes1[i, 2], bboxes2[:, 2])
+        y_end = np.minimum(bboxes1[i, 3], bboxes2[:, 3])
+        overlap = np.maximum(x_end - x_start, 0) * np.maximum(y_end - y_start, 0)
+        if mode == "iou":
+            union = area1[i] + area2 - overlap
+        else:
+            union = area1[i] if not exchange else area2
+        union = np.maximum(union, eps)
+        ious[i, :] = overlap / union
+    if exchange:
+        ious = ious.T
+    return ious
