@@ -9,7 +9,6 @@ from math import radians
 from typing import Optional
 
 import idprop
-import numpy as np
 from blenderproc.python.types.MaterialUtility import Material
 from blenderproc.python.types.MeshObjectUtility import MeshObject
 from mathutils import Euler, Vector
@@ -19,6 +18,8 @@ from PIL import Image, ImageDraw, ImageFont
 sys.path.append(os.path.dirname(__file__))
 
 from utils import (
+    collect_materials_by_cp,
+    find_bbox_by_alpha,
     get_cp,
     rand_rotation_euler,
     reset_keyframes,
@@ -97,17 +98,10 @@ def parse_args():
     return args
 
 
-def collect_materials() -> list[Material]:
-    materials = bproc.material.collect_all()
-    materials = bproc.filter.by_cp(
-        materials, "random_material", True, filtered_data_type=Material
-    )
-    print(f"Find {len(materials)} materials")
-    return materials
-
-
 def group_and_filter_material_slots_by_cp(
-    objs: list[MeshObject], group_cp_name: str, filter_cp_name: str
+    objs: list[MeshObject],
+    group_cp_name: str = "group_name",
+    filter_cp_name: str = "material_randomization",
 ) -> dict[str, list[tuple[MeshObject, int]]]:
     def get_cp_(obj: MeshObject, cp_name: str, default):
         cp_values = get_cp(obj, cp_name, default=default)
@@ -228,7 +222,7 @@ def main(
     objs, uav_models = setup(
         scene_path, background_path, device_type, devices, motion_blur=True
     )
-    materials = collect_materials()
+    materials = collect_materials_by_cp()
 
     if models is not None:
         uav_models = {name: uav_models[name] for name in models}
@@ -253,9 +247,7 @@ def main(
         select_object(uav_model)
 
         # get material slots which require material_randomization
-        material_slots_groups = group_and_filter_material_slots_by_cp(
-            uav_components, "group_name", "material_randomization"
-        )
+        material_slots_groups = group_and_filter_material_slots_by_cp(uav_components)
 
         for i in range(samples):
             frame = randomize_drone_properties(
@@ -274,14 +266,10 @@ def main(
             color = data["colors"][0]
 
             # find the bounding box
-            y_indices, x_indices = color[..., -1].nonzero()
-            min_x = np.amin(x_indices)
-            max_x = np.amax(x_indices)
-            min_y = np.amin(y_indices)
-            max_y = np.amax(y_indices)
+            bbox = find_bbox_by_alpha(color)
 
             image = Image.fromarray(color, mode="RGBA")
-            draw_bounding_box(image, [min_x, min_y, max_x, max_y])
+            draw_bounding_box(image, bbox)
             image.save(os.path.join(out_path, f"{i}_{frame}.png"))
 
             # write the data to a .hdf5 container in the run-specific output directory

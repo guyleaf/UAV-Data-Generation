@@ -5,6 +5,7 @@ from math import radians
 
 import blenderproc as bproc
 import bpy
+import numpy as np
 from blenderproc.api.types import MeshObject
 from mathutils import Euler, Matrix, Vector
 
@@ -86,6 +87,17 @@ def setup(
     return objs, uav_models
 
 
+def collect_materials_by_cp(
+    cp_name: str = "random_material",
+) -> list[bproc.types.Material]:
+    materials = bproc.material.collect_all()
+    materials = bproc.filter.by_cp(
+        materials, cp_name, True, filtered_data_type=bproc.types.Material
+    )
+    print(f"Find {len(materials)} materials")
+    return materials
+
+
 def get_cp(object: MeshObject, key: str, default=None):
     if object.has_cp(key):
         return object.get_cp(key)
@@ -145,3 +157,13 @@ def rand_rotation_euler(
     rot_matrix.rotate(Euler((0, y_angle, 0)))
     rot_matrix.rotate(Euler((0, 0, z_angle)))
     return rot_matrix.to_euler()
+
+
+def find_bbox_by_alpha(image: np.ndarray):
+    assert image.shape[-1] == 4, "The color format should be in RGBA."
+    y_indices, x_indices = image[..., -1].nonzero()
+    min_x = np.amin(x_indices)
+    max_x = np.amax(x_indices)
+    min_y = np.amin(y_indices)
+    max_y = np.amax(y_indices)
+    return min_x, min_y, max_x, max_y
