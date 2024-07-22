@@ -1,15 +1,18 @@
 import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the top due to the check of blenderproc
+
+import warnings
+
 import bpy  # noqa: F401 # isort:skip
 import argparse
 import os
 import random
 import sys
 from collections import defaultdict
-from math import radians
+from math import radians, sqrt
 from typing import Optional
 
 import idprop
-import tqdm
+import PIL.Image as Image
 from blenderproc.python.types.MaterialUtility import Material
 from blenderproc.python.types.MeshObjectUtility import MeshObject
 from mathutils import Euler, Vector
@@ -17,9 +20,10 @@ from mathutils import Euler, Vector
 sys.path.append(os.path.dirname(__file__))
 
 from utils import (
+    bbox_overlaps,
     collect_images,
     collect_materials_by_cp,
-    find_bbox_by_alpha,
+    find_bbox_xyxy_by_alpha,
     get_cp,
     rand_rotation_euler,
     reset_keyframes,
@@ -78,8 +82,14 @@ def parse_args():
         "--scale-range",
         nargs=2,
         type=float,
-        default=(0.2, 0.8),
-        help="The size range of generated UAVs relative to the size of image.",
+        default=(0.2, 0.5),
+        help="The scale range relative to the size of image.",
+    )
+    parser.add_argument(
+        "--max-iou",
+        type=float,
+        default=0.2,
+        help="The maximum IoU among UAVs in image. (max_iou > 0 -> accept occlusion)",
     )
 
     # blender's render settings
@@ -150,8 +160,9 @@ def parse_args():
         0 < args.max_samples
     ), "The maximum number of samples should be greater than 0."
     assert (
-        0 < args.scale_range[0] <= args.scale_range[1] < 1
-    ), "The scale range should be between 0 and 1."
+        0 < args.scale_range[0] <= args.scale_range[1] <= 1
+    ), "The scale range should be in (0, 1]."
+    assert 0 <= args.max_iou <= 1, "The maximum IoU should be in (0, 1)."
     return args
 
 
@@ -279,7 +290,7 @@ def generate_uav_samples(
 
         # render the whole pipeline
         bproc.utility.set_keyframe_render_interval(frame_start=frame)
-        yield bproc.renderer.render()["colors"][0]
+        image = bproc.renderer.render()["colors"][0]
 
         # hide current components for next rendering
         for uav_component in uav_components:
@@ -288,16 +299,84 @@ def generate_uav_samples(
         # reset keyframes
         reset_keyframes(original_action_keys)
 
+        yield image
+
+
+def get_scaled_uav_size(
+    scale_range: tuple[float, float],
+    image_size: tuple[int, int],
+    uav_size: tuple[int, int],
+) -> tuple[int, int]:
+    image_total_size = image_size[0] * image_size[1]
+    uav_total_size = uav_size[0] * uav_size[1]
+
+    # randomly sample a scale_ratio
+    for _ in range(50):
+        scale_ratio = random.uniform(*scale_range)
+
+        # avoid upscaling becuse we don't constrain the original size
+        if (image_total_size * scale_ratio) <= uav_total_size:
+            # calculate scaled width, height
+            # w * r, h * r = (W, H)
+            # w * h * r^2 ~= image_total_size * scale_ratio
+            # r = sqrt(image_total_size * scale_ratio / uav_total_size)
+            uav_scale_ratio = sqrt(image_total_size * scale_ratio / uav_total_size)
+
+            # round to the closet integer & round half to even (default rounding mode in IEEE 754)
+            return round(uav_size[0] * uav_scale_ratio), round(
+                uav_size[1] * uav_scale_ratio
+            )
+
+    raise RuntimeError(f"Cannot find an ideal scale fitting the range {scale_range}.")
+
+
+def scale_uav(
+    uav_image: Image.Image,
+    scale_range: tuple[float, float],
+    image_size: tuple[int, int],
+) -> Image.Image:
+    # determine the scaled size of UAV object
+    scaled_uav_size = get_scaled_uav_size(scale_range, image_size, uav_image.size)
+
+    # scale the UAV
+    # Filter comparison: https://pillow.readthedocs.io/en/stable/handbook/concepts.html#filters-comparison-table
+    uav_image = uav_image.resize(scaled_uav_size, Image.LANCZOS)
+    return uav_image
+
+
+def get_uav_location(
+    image_size: tuple[int, int],
+    uav_size: tuple[int, int],
+    bboxes: list[tuple[int, int, int, int]],
+    max_iou: float = 0,
+) -> Optional[tuple[int, int]]:
+    end_w, end_h = image_size[0] - uav_size[0], image_size[1] - uav_size[1]
+
+    for _ in range(50):
+        # randomly sample a position from image based on the actual size
+        x = random.randint(0, max(end_w, 0))
+        y = random.randint(0, max(end_h, 0))
+
+        # check if there is no overlap (or below the overlap threshold) among bboxes list
+        ious = bbox_overlaps([[x, y, *uav_size]], bboxes)
+        if (ious <= max_iou).all():
+            return x, y
+
+    warnings.warn(f"Cannot find an ideal location fitting the maximum IoU {max_iou}.")
+    return None
+
 
 def main(
     scene_path: str,
     background_path: str,
     images_path: str,
     models: Optional[list[str]] = None,
-    max_samples: int = 20,
     x_range: tuple[int, int] = (-45, 45),
     y_range: tuple[int, int] = (-45, 45),
     z_range: tuple[int, int] = (0, 360),
+    max_samples: int = 20,
+    scale_range: tuple[float, float] = (0.2, 0.8),
+    max_iou: float = 0.5,
     motion_blur: bool = True,
     render_resolution: tuple[int, int] = (1920, 1920),
     render_max_samples: int = 1024,
@@ -328,58 +407,73 @@ def main(
     camera.rotation_euler = Euler((radians(90), 0, 0))
     bpy.context.view_layer.update()
 
-    for image_path in tqdm.tqdm(image_paths, desc="Generating..."):
+    images = []
+    annotations = []
+    for image_path in image_paths:
         # determine how many samples should be generated
         num_samples = random.randint(1, max_samples)
         selected_models = random.choices(list(uav_models.values()), k=num_samples)
 
-        # create an foreground image with the same size as the image by Pillow
+        # create an foreground image with the same size as the image
+        background_image = Image.open(image_path)
+        foreground_image = Image.new("RGBA", background_image.size)
+        background_image.close()
 
-        bboxes = []
+        uav_images: list[Image.Image] = []
+        uav_bboxes: list[tuple[int, int, int, int]] = []
+        image_size = foreground_image.size
         for rendered_image in generate_uav_samples(
             selected_models, materials, x_range, y_range, z_range
         ):
             # utilize the alpha channel to find the bbox
-            x1, y1, x2, y2 = find_bbox_by_alpha(rendered_image)
+            x1, y1, x2, y2 = find_bbox_xyxy_by_alpha(rendered_image)
 
             # cut the image by bbox to get the actual size of UAV object
-            rendered_image = rendered_image[y1:y2, x1:x2]
+            uav_image = rendered_image[y1:y2, x1:x2]
+            uav_image = Image.fromarray(uav_image, "RGBA")
 
-            # randomly sample the actual size of the object by scale_ratio
-            # check if the original size is greater than the actual size
-            # if not, retry it.
+            # scale UAV
+            uav_image = scale_uav(uav_image, scale_range, image_size)
 
-            # scale the object to it
+            # determine the location of UAV on the foreground image
+            uav_location = get_uav_location(
+                image_size, uav_image.size, uav_bboxes, max_iou=max_iou
+            )
+            # if it returns None, stop generating. (no space)
+            if uav_location is None:
+                print(f"Total UAVs: {len(uav_bboxes)}. Skipping...")
+                break
 
-            # randomly sample a position from image based on the actual size
+            uav_images.append(uav_image)
+            uav_bboxes.append((*uav_location, *uav_image.size))
 
-            # check if there is no overlap (or below the overlap threshold) among bboxes list
-
-            # use Pillow to paste the object on the foreground image
-
-            # record the bbox
-            # bboxes.append(bbox)
+        # paste UAVs starting from the most distant UAV
+        # sort by uav_size
+        indices = list(range(len(uav_bboxes)))
+        indices.sort(key=lambda i: uav_bboxes[i][2] * uav_bboxes[i][3])
+        for i in indices:
+            uav_image, bbox = uav_images[i], uav_bboxes[i]
+            foreground_image.paste(uav_image, box=bbox[:2], mask=uav_image)
 
         # save the foreground image
+        rel_path = os.path.relpath(os.path.dirname(image_path), images_path)
+        out_path = os.path.join(out_dir, rel_path)
+        os.makedirs(out_path, exist_ok=True)
+
+        image_name, _ = os.path.splitext(os.path.basename(image_path))
+        out_file = os.path.join(out_path, f"{image_name}.png")
+        foreground_image.save(out_file)
+
+    # save annotations in COCO format
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    os.environ["BLENDER_PROC_RANDOM_SEED"] = str(args.seed)
+    args = vars(parse_args())
+    os.environ["BLENDER_PROC_RANDOM_SEED"] = str(args.pop("seed"))
+    # TODO: refactor to use class
     main(
-        args.scene_path,
-        args.background_path,
-        args.images_path,
-        models=args.models,
-        max_samples=args.max_samples,
-        x_range=args.x_range,
-        y_range=args.y_range,
-        z_range=args.z_range,
-        motion_blur=args.motion_blur,
-        render_resolution=args.render_resolution,
-        render_max_samples=args.render_max_samples,
-        render_tile_size=args.render_tile_size,
-        out_dir=args.out_dir,
-        device_type=args.device_type,
-        devices=args.devices,
+        args.pop("scene_path"),
+        args.pop("background_path"),
+        args.pop("images_path"),
+        **args,
     )

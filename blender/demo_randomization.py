@@ -19,7 +19,7 @@ sys.path.append(os.path.dirname(__file__))
 
 from utils import (
     collect_materials_by_cp,
-    find_bbox_by_alpha,
+    find_bbox_xyxy_by_alpha,
     get_cp,
     rand_rotation_euler,
     reset_keyframes,
@@ -266,7 +266,7 @@ def main(
             color = data["colors"][0]
 
             # find the bounding box
-            bbox = find_bbox_by_alpha(color)
+            bbox = find_bbox_xyxy_by_alpha(color)
 
             image = Image.fromarray(color, mode="RGBA")
             draw_bounding_box(image, bbox)

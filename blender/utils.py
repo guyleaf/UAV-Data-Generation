@@ -108,10 +108,12 @@ def collect_images(root_path: str):
         mime_type = mime_checker.guess_type(path)[0]
         return mime_type is not None and "image" in mime_type
 
-    return list(
+    return map(
+        lambda path: os.path.join(root_path, path),
         filter(
-            validate_file_type, glob.iglob("**/*.*", root_dir=root_path, recursive=True)
-        )
+            validate_file_type,
+            glob.iglob("**/*.*", root_dir=root_path, recursive=True),
+        ),
     )
 
 
@@ -176,7 +178,7 @@ def rand_rotation_euler(
     return rot_matrix.to_euler()
 
 
-def find_bbox_by_alpha(image: np.ndarray):
+def find_bbox_xyxy_by_alpha(image: np.ndarray):
     assert image.shape[-1] == 4, "The color format should be in RGBA."
     y_indices, x_indices = image[..., -1].nonzero()
     min_x = np.amin(x_indices)
@@ -202,8 +204,8 @@ def bbox_overlaps(
     """Calculate the ious between each bbox of bboxes1 and bboxes2.
 
     Args:
-        bboxes1 (Union[np.ndarray, list[tuple[int, int, int, int]]]): Shape (n, 4)
-        bboxes2 (Union[np.ndarray, list[tuple[int, int, int, int]]]): Shape (k, 4)
+        bboxes1 (Union[np.ndarray, list[tuple[int, int, int, int]]]): Shape (n, 4), Format (x, y, w, h)
+        bboxes2 (Union[np.ndarray, list[tuple[int, int, int, int]]]): Shape (k, 4), Format (x, y, w, h)
         mode (str): IOU (intersection over union) or IOF (intersection
             over foreground)
 
