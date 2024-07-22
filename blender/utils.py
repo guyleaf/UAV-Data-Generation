@@ -4,6 +4,7 @@ import random
 from collections import defaultdict
 from math import radians
 from mimetypes import MimeTypes
+from typing import Union
 
 import blenderproc as bproc
 import bpy
@@ -108,7 +109,9 @@ def collect_images(root_path: str):
         return mime_type is not None and "image" in mime_type
 
     return list(
-        filter(validate_file_type, glob.iglob("**/*.*", root_dir=root_path, recursive=True))
+        filter(
+            validate_file_type, glob.iglob("**/*.*", root_dir=root_path, recursive=True)
+        )
     )
 
 
@@ -183,19 +186,24 @@ def find_bbox_by_alpha(image: np.ndarray):
     return min_x, min_y, max_x, max_y
 
 
+def bboxes_xywh_to_xyxy(bboxes: np.ndarray):
+    bboxes[:, 2:] = bboxes[:, :2] + bboxes[:, 2:]
+    return bboxes
+
+
 # Copyright (c) OpenMMLab. All rights reserved.
 # Modified from https://github.com/open-mmlab/mmdetection/blob/cfd5d3a985b0249de009b67d04f37263e11cdf3d/mmdet/evaluation/functional/bbox_overlaps.py
 def bbox_overlaps(
-    bboxes1: np.ndarray,
-    bboxes2: np.ndarray,
+    bboxes1: Union[np.ndarray, list[tuple[int, int, int, int]]],
+    bboxes2: Union[np.ndarray, list[tuple[int, int, int, int]]],
     mode: str = "iou",
     eps: float = 1e-6,
 ):
     """Calculate the ious between each bbox of bboxes1 and bboxes2.
 
     Args:
-        bboxes1 (ndarray): Shape (n, 4)
-        bboxes2 (ndarray): Shape (k, 4)
+        bboxes1 (Union[np.ndarray, list[tuple[int, int, int, int]]]): Shape (n, 4)
+        bboxes2 (Union[np.ndarray, list[tuple[int, int, int, int]]]): Shape (k, 4)
         mode (str): IOU (intersection over union) or IOF (intersection
             over foreground)
 
@@ -204,21 +212,30 @@ def bbox_overlaps(
     """
 
     assert mode in ["iou", "iof"]
+    if not isinstance(bboxes1, np.ndarray):
+        bboxes1 = np.array(bboxes1)
+    if not isinstance(bboxes2, np.ndarray):
+        bboxes2 = np.array(bboxes2)
 
     bboxes1 = bboxes1.astype(np.float32)
     bboxes2 = bboxes2.astype(np.float32)
+
     rows = bboxes1.shape[0]
     cols = bboxes2.shape[0]
     ious = np.zeros((rows, cols), dtype=np.float32)
     if rows * cols == 0:
         return ious
+
     exchange = False
     if bboxes1.shape[0] > bboxes2.shape[0]:
         bboxes1, bboxes2 = bboxes2, bboxes1
         ious = np.zeros((cols, rows), dtype=np.float32)
         exchange = True
-    area1 = (bboxes1[:, 2] - bboxes1[:, 0]) * (bboxes1[:, 3] - bboxes1[:, 1])
-    area2 = (bboxes2[:, 2] - bboxes2[:, 0]) * (bboxes2[:, 3] - bboxes2[:, 1])
+
+    area1 = bboxes1[:, 2] * bboxes1[:, 3]
+    area2 = bboxes2[:, 2] * bboxes2[:, 3]
+    bboxes1 = bboxes_xywh_to_xyxy(bboxes1)
+    bboxes2 = bboxes_xywh_to_xyxy(bboxes2)
     for i in range(bboxes1.shape[0]):
         x_start = np.maximum(bboxes1[i, 0], bboxes2[:, 0])
         y_start = np.maximum(bboxes1[i, 1], bboxes2[:, 1])
@@ -231,6 +248,7 @@ def bbox_overlaps(
             union = area1[i] if not exchange else area2
         union = np.maximum(union, eps)
         ious[i, :] = overlap / union
+
     if exchange:
         ious = ious.T
     return ious
