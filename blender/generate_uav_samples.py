@@ -19,6 +19,7 @@ from mathutils import Euler, Vector
 
 sys.path.append(os.path.dirname(__file__))
 
+from coco import COCOWriter
 from utils import (
     bbox_overlaps,
     collect_images,
@@ -407,8 +408,9 @@ def main(
     camera.rotation_euler = Euler((radians(90), 0, 0))
     bpy.context.view_layer.update()
 
-    images = []
-    annotations = []
+    images_dir = os.path.join(out_dir, "images")
+    annotations_dir = os.path.join(out_dir, "annotations")
+    coco_writer = COCOWriter()
     for image_path in image_paths:
         # determine how many samples should be generated
         num_samples = random.randint(1, max_samples)
@@ -455,16 +457,24 @@ def main(
             uav_image, bbox = uav_images[i], uav_bboxes[i]
             foreground_image.paste(uav_image, box=bbox[:2], mask=uav_image)
 
-        # save the foreground image
+        # get output path
         rel_path = os.path.relpath(os.path.dirname(image_path), images_path)
-        out_path = os.path.join(out_dir, rel_path)
-        os.makedirs(out_path, exist_ok=True)
-
         image_name, _ = os.path.splitext(os.path.basename(image_path))
-        out_file = os.path.join(out_path, f"{image_name}.png")
+        out_file = os.path.join(rel_path, f"{image_name}.png")
+
+        # add image info to COCOWriter
+        image_id = coco_writer.add_image(out_file, *foreground_image.size)
+        coco_writer.add_annotations(image_id, 1, uav_bboxes)
+
+        # save the foreground image
+        out_file = os.path.join(images_dir, out_file)
+        os.makedirs(os.path.dirname(out_file), exist_ok=True)
         foreground_image.save(out_file)
 
     # save annotations in COCO format
+    os.makedirs(annotations_dir, exist_ok=True)
+    out_file = os.path.join(annotations_dir, "all.json")
+    coco_writer.export(out_file)
 
 
 if __name__ == "__main__":

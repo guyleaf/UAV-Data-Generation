@@ -76,13 +76,13 @@ class COCOWriter:
     def add_image(
         self,
         file_name: str,
-        w: int,
-        h: int,
+        width: int,
+        height: int,
     ) -> int:
-        assert w > 0 and h > 0, f"Invalid size, ({w}, {h})"
+        assert width > 0 and height > 0, f"Invalid size, ({width}, {height})"
 
         id = self.image_counter
-        image = self.get_image_format(file_name, w, h)
+        image = self.get_image_format(file_name, width, height)
         self.images.append(image)
         self.image_counter += 1
         return id
@@ -91,21 +91,24 @@ class COCOWriter:
         self,
         image_id: int,
         category_id: int,
-        x: int,
-        y: int,
-        w: int,
-        h: int,
+        bboxes: list[tuple[int, int, int, int]],
         attributes: dict = {},
-    ) -> int:
+    ) -> list[int]:
         assert image_id >= self.image_counter, f"Unknown image_id {image_id}"
+        assert any(
+            category["id"] == category_id for category in self.coco["categories"]
+        ), f"Unknown category {category_id}"
 
-        id = self.annotation_counter
-        annotation = self.get_annotation_format(
-            id, image_id, category_id, x, y, w, h, attributes=attributes
-        )
-        self.annotations.append(annotation)
-        self.annotation_counter += 1
-        return id
+        ids = []
+        for bbox in bboxes:
+            id = self.annotation_counter
+            annotation = self.get_annotation_format(
+                id, image_id, category_id, *bbox, attributes=attributes
+            )
+            ids.append(id)
+            self.annotations.append(annotation)
+            self.annotation_counter += 1
+        return ids
 
     def export(self, path: str):
         os.makedirs(os.path.dirname(path), exist_ok=True)
