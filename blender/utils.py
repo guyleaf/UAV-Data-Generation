@@ -140,7 +140,7 @@ def select_object(obj: MeshObject):
     bpy.ops.object.select_all(action="DESELECT")
     bpy.context.view_layer.objects.active = obj.blender_obj
     obj.select()
-    bpy.ops.object.select_hierarchy(direction="CHILD", extend=True)
+    bpy.ops.object.select_grouped(type="CHILDREN_RECURSIVE", extend=True)
 
 
 def translate_axis(obj: bpy.types.Object, axis: str, amount: float):
