@@ -9,7 +9,9 @@ from typing import Union
 import blenderproc as bproc
 import bpy
 import numpy as np
-from blenderproc.api.types import MeshObject
+from blenderproc.api.types import Entity, MeshObject, Struct
+from blenderproc.python.utility.Utility import KeyFrame
+from bpy_extras.object_utils import world_to_camera_view
 from mathutils import Euler, Matrix, Vector
 
 AXIS = {
@@ -66,6 +68,7 @@ def setup(
     bpy.context.scene.cycles.tile_size = tile_size
 
     if motion_blur:
+        print("Enabling motion blur")
         bproc.renderer.enable_motion_blur(motion_blur_length=0.5)
 
     # collect UAV models by custom property
@@ -117,9 +120,9 @@ def collect_images(root_path: str):
     )
 
 
-def get_cp(object: MeshObject, key: str, default=None):
-    if object.has_cp(key):
-        return object.get_cp(key)
+def get_cp(obj: Struct, key: str, default=None):
+    if obj.has_cp(key):
+        return obj.get_cp(key)
     else:
         return default
 
@@ -136,14 +139,19 @@ def reset_keyframes(original_action_keys: list[str] = []) -> None:
         bpy.data.actions.remove(action)
 
 
-def select_object(obj: MeshObject):
+def select_objects(objs: list[Entity]):
+    assert len(objs) > 0
+
     bpy.ops.object.select_all(action="DESELECT")
-    bpy.context.view_layer.objects.active = obj.blender_obj
-    obj.select()
-    bpy.ops.object.select_grouped(type="CHILDREN_RECURSIVE", extend=True)
+    bpy.context.view_layer.objects.active = objs[0].blender_obj
+    for obj in objs:
+        obj.select()
 
 
-def translate_axis(obj: bpy.types.Object, axis: str, amount: float):
+def translate_axis(obj: Union[Entity, bpy.types.Object], axis: str, amount: float):
+    if isinstance(obj, Entity):
+        obj = obj.blender_obj
+
     axis_vector = Vector(AXIS[axis.upper()])
     axis_vector *= amount
 
@@ -178,9 +186,36 @@ def rand_rotation_euler(
     return rot_matrix.to_euler()
 
 
-def find_bbox_xyxy_by_alpha(image: np.ndarray):
+def is_vertex_in_camera_view(vertex: Union[np.ndarray, Vector]) -> bool:
+    if isinstance(vertex, np.ndarray):
+        vertex = Vector(vertex)
+
+    camera = bpy.context.scene.camera
+    vertex_in_camera_view = world_to_camera_view(
+        bpy.context.scene, camera, Vector(vertex)
+    )
+    return (
+        0 <= vertex_in_camera_view.x <= 1
+        and 0 <= vertex_in_camera_view.y <= 1
+        and camera.data.clip_start <= vertex_in_camera_view.z <= camera.data.clip_end
+    )
+
+
+def are_all_meshes_in_camera_view(meshes: list[MeshObject], frames: list[int]):
+    result = True
+    for frame in frames:
+        with KeyFrame(frame):
+            vertices = [mesh.get_bound_box() for mesh in meshes]
+            vertices = np.concatenate(vertices, axis=0)
+        result = result and all(map(is_vertex_in_camera_view, vertices))
+    return result
+
+
+def find_bbox_xyxy_by_alpha(image: np.ndarray) -> tuple[int, int, int, int]:
     assert image.shape[-1] == 4, "The color format should be in RGBA."
     y_indices, x_indices = image[..., -1].nonzero()
+    # follow the COCO format which is 0-indexed
+    # reference: https://cocodataset.org/#format-data
     min_x = np.amin(x_indices)
     max_x = np.amax(x_indices) + 1
     min_y = np.amin(y_indices)
@@ -218,6 +253,9 @@ def bbox_overlaps(
         bboxes1 = np.array(bboxes1)
     if not isinstance(bboxes2, np.ndarray):
         bboxes2 = np.array(bboxes2)
+
+    assert bboxes1.ndim == 2 and bboxes1.shape[1] == 4
+    assert bboxes2.ndim == 2 and bboxes2.shape[1] == 4
 
     bboxes1 = bboxes1.astype(np.float32)
     bboxes2 = bboxes2.astype(np.float32)
