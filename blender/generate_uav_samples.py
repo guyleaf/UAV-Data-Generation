@@ -397,23 +397,34 @@ def main(
             # utilize the alpha channel to find the bbox
             x1, y1, x2, y2 = find_bbox_xyxy_by_alpha(uav_image)
 
-            # cut the image by bbox to get the actual size of UAV object
+            # cut the image by bbox to get the actual size of UAV
             uav_image = uav_image[y1:y2, x1:x2]
             uav_image = Image.fromarray(uav_image, "RGBA")
 
-            # scale UAV
-            uav_image = scale_uav(
-                uav_image, scale_range, image_size, allow_upscaling=allow_upscaling
-            )
+            # retry
+            for _ in range(50):
+                # determine the scaled size of UAV
+                scaled_uav_size = sample_uav_size(
+                    scale_range,
+                    image_size,
+                    uav_image.size,
+                    allow_upscaling=allow_upscaling,
+                )
 
-            # determine the location of UAV on the foreground image
-            uav_location = sample_uav_location(
-                image_size, uav_image.size, uav_bboxes, max_iou=max_iou
-            )
-            # if it returns None, stop generating. (no space)
-            if uav_location is None:
+                # determine the location of UAV on the foreground image
+                uav_location = sample_uav_location(
+                    image_size, scaled_uav_size, uav_bboxes, max_iou=max_iou
+                )
+                if uav_location is not None:
+                    break
+            else:
+                # after trying 50 times, stop generating. (no space)
                 print("Skipping...", end="")
-                break
+                continue
+
+            # scale the UAV
+            # filter comparison: https://pillow.readthedocs.io/en/stable/handbook/concepts.html#filters-comparison-table
+            uav_image = uav_image.resize(scaled_uav_size, Image.LANCZOS)
 
             uav_images.append(uav_image)
             uav_bboxes.append((*uav_location, *uav_image.size))
@@ -441,6 +452,8 @@ def main(
         out_file = os.path.join(images_dir, out_file)
         os.makedirs(os.path.dirname(out_file), exist_ok=True)
         foreground_image.save(out_file)
+
+        print(f"Saved the foreground image as {out_file}")
 
     # save annotations in COCO format
     os.makedirs(annotations_dir, exist_ok=True)
