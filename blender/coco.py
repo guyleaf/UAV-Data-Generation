@@ -11,9 +11,7 @@ class COCOWriter:
         version: int = 1,
         description: str = "Weather Anti-UAV dataset",
         url: str = "https://github.com/guyleaf/UAV-Data-Generation",
-        categories: list[dict] = [
-            dict(id=1, name="drone", supercategory="UAV"),
-        ],
+        licenses: list[dict] = [],
     ) -> None:
         self.coco = dict(
             info=dict(
@@ -23,20 +21,16 @@ class COCOWriter:
                 url=url,
                 date_created=datetime.date.today().isoformat(),
             ),
-            licenses=[
-                dict(
-                    id=1,
-                    name="GNU General Public License v3.0",
-                    url="https://www.gnu.org/licenses/gpl-3.0.en.html",
-                )
-            ],
+            licenses=licenses,
             images=[],
             annotations=[],
-            categories=categories,
+            categories=[],
         )
         self.images = self.coco["images"]
         self.annotations = self.coco["annotations"]
+        self.categories = self.coco["categories"]
 
+        self.category_counter = 1
         self.image_counter = 1
         self.annotation_counter = 1
 
@@ -73,6 +67,13 @@ class COCOWriter:
         )
         return annotation
 
+    def add_category(self, name: str, supercategory: str) -> int:
+        id = self.category_counter
+        category = dict(id=id, name=name, supercategory=supercategory)
+        self.categories.append(category)
+        self.category_counter += 1
+        return id
+
     def add_image(
         self,
         file_name: str,
@@ -82,7 +83,7 @@ class COCOWriter:
         assert width > 0 and height > 0, f"Invalid size, ({width}, {height})"
 
         id = self.image_counter
-        image = self.get_image_format(file_name, width, height)
+        image = self.get_image_format(id, file_name, width, height)
         self.images.append(image)
         self.image_counter += 1
         return id
@@ -92,19 +93,16 @@ class COCOWriter:
         image_id: int,
         category_id: int,
         bboxes: list[tuple[int, int, int, int]],
-        attributes: dict = {},
     ) -> list[int]:
-        assert image_id >= self.image_counter, f"Unknown image_id {image_id}"
+        assert image_id < self.image_counter, f"Unknown image_id {image_id}"
         assert any(
-            category["id"] == category_id for category in self.coco["categories"]
+            category["id"] == category_id for category in self.categories
         ), f"Unknown category {category_id}"
 
         ids = []
         for bbox in bboxes:
             id = self.annotation_counter
-            annotation = self.get_annotation_format(
-                id, image_id, category_id, *bbox, attributes=attributes
-            )
+            annotation = self.get_annotation_format(id, image_id, category_id, *bbox)
             ids.append(id)
             self.annotations.append(annotation)
             self.annotation_counter += 1

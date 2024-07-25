@@ -212,11 +212,13 @@ def main(
 
         for i in range(samples):
             frame = randomize_drone_properties(
-                uav_model, material_slots_groups, materials, x_range, y_range, z_range
+                uav_model,
+                material_slots_groups,
+                materials,
+                x_range=x_range,
+                y_range=y_range,
+                z_range=z_range,
             )
-
-            # set the start frame of renderer
-            bproc.utility.set_keyframe_render_interval(frame_start=frame)
 
             # align the camera with the UAV
             z_offset = align_camera_pose(
@@ -229,6 +231,7 @@ def main(
             )
 
             # render the whole pipeline
+            bproc.utility.set_keyframe_render_interval(frame_start=frame)
             data = bproc.renderer.render()
             color = data["colors"][0]
             image = Image.fromarray(color, mode="RGBA")

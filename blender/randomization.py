@@ -73,9 +73,9 @@ def randomize_drone_properties(
     uav_model: MeshObject,
     material_slots_groups: dict[str, list[tuple[MeshObject, int]]],
     materials: list[Material],
-    x_range: tuple[int, int],
-    y_range: tuple[int, int],
-    z_range: tuple[int, int],
+    x_range: tuple[int, int] = (-45, 45),
+    y_range: tuple[int, int] = (-45, 45),
+    z_range: tuple[int, int] = (0, 360),
 ) -> int:
     # randomly sample a frame for animation
     frame = random.randint(0, 249)
@@ -102,7 +102,7 @@ def randomize_drone_properties(
 def align_camera_pose(
     frame: int,
     uav_components: list[MeshObject],
-    adaptive_alignment: bool = False,
+    adaptive_alignment: bool = True,
     alignment_z_offset: float = 0,
     alignment_z_step: float = 0.1,
     motion_blur: bool = True,

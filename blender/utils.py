@@ -111,12 +111,14 @@ def collect_images(root_path: str):
         mime_type = mime_checker.guess_type(path)[0]
         return mime_type is not None and "image" in mime_type
 
-    return map(
-        lambda path: os.path.join(root_path, path),
-        filter(
-            validate_file_type,
-            glob.iglob("**/*.*", root_dir=root_path, recursive=True),
-        ),
+    return sorted(
+        map(
+            lambda path: os.path.join(root_path, path),
+            filter(
+                validate_file_type,
+                glob.iglob("**/*.*", root_dir=root_path, recursive=True),
+            ),
+        )
     )
 
 
@@ -253,9 +255,6 @@ def bbox_overlaps(
         bboxes1 = np.array(bboxes1)
     if not isinstance(bboxes2, np.ndarray):
         bboxes2 = np.array(bboxes2)
-
-    assert bboxes1.ndim == 2 and bboxes1.shape[1] == 4
-    assert bboxes2.ndim == 2 and bboxes2.shape[1] == 4
 
     bboxes1 = bboxes1.astype(np.float32)
     bboxes2 = bboxes2.astype(np.float32)

@@ -1,17 +1,14 @@
 import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the top due to the check of blenderproc
 
-import warnings
 
 import bpy  # noqa: F401 # isort:skip
 import argparse
 import os
 import random
 import sys
-from collections import defaultdict
 from math import radians, sqrt
 from typing import Optional
 
-import idprop
 import PIL.Image as Image
 from blenderproc.python.types.MaterialUtility import Material
 from blenderproc.python.types.MeshObjectUtility import MeshObject
@@ -20,17 +17,19 @@ from mathutils import Euler, Vector
 sys.path.append(os.path.dirname(__file__))
 
 from coco import COCOWriter
+from randomization import (
+    align_camera_pose,
+    group_and_filter_material_slots_by_cp,
+    randomize_drone_properties,
+)
 from utils import (
     bbox_overlaps,
     collect_images,
     collect_materials_by_cp,
     find_bbox_xyxy_by_alpha,
     get_cp,
-    rand_rotation_euler,
     reset_keyframes,
-    select_object,
     setup,
-    translate_axis,
 )
 
 
@@ -80,6 +79,12 @@ def parse_args():
         help="The maximum number of UAVs per image.",
     )
     parser.add_argument(
+        "--max-iou",
+        type=float,
+        default=0.2,
+        help="The maximum IoU among UAVs in image. (max_iou > 0 -> accept occlusion)",
+    )
+    parser.add_argument(
         "--scale-range",
         nargs=2,
         type=float,
@@ -87,13 +92,31 @@ def parse_args():
         help="The scale range relative to the size of image.",
     )
     parser.add_argument(
-        "--max-iou",
+        "--allow-upscaling",
+        default=False,
+        action=argparse.BooleanOptionalAction,
+        help="Allow upscaling if UAV is smaller than the sampled scale",
+    )
+    parser.add_argument(
+        "--adaptive-alignment",
+        default=True,
+        action=argparse.BooleanOptionalAction,
+        help="Enable adaptive alignment with the step (useful with motion blur)",
+    )
+    parser.add_argument(
+        "--alignment-z-offset",
         type=float,
-        default=0.2,
-        help="The maximum IoU among UAVs in image. (max_iou > 0 -> accept occlusion)",
+        default=0,
+        help="Align the camera with the UAV and move backward with the offset (m) (useful with motion blur)",
+    )
+    parser.add_argument(
+        "--alignment-z-step",
+        type=float,
+        default=0.001,
+        help="Increase the alignment distance with the step (m) (--adaptive-alignment only)",
     )
 
-    # blender's render settings
+    # render settings
     parser.add_argument(
         "--motion-blur",
         default=True,
@@ -116,7 +139,7 @@ def parse_args():
     parser.add_argument(
         "--render-tile-size",
         type=int,
-        default=1024,
+        default=2048,
         help="The tile size for rendering a image (less -> slower & lower VRAM requirement, higher -> faster & higher VRAM requirement)",
     )
 
@@ -167,105 +190,16 @@ def parse_args():
     return args
 
 
-def group_and_filter_material_slots_by_cp(
-    objs: list[MeshObject],
-    group_cp_name: str = "group_name",
-    filter_cp_name: str = "material_randomization",
-) -> dict[str, list[tuple[MeshObject, int]]]:
-    def get_cp_(obj: MeshObject, cp_name: str, default):
-        cp_values = get_cp(obj, cp_name, default=default)
-        if isinstance(cp_values, idprop.types.IDPropertyArray):
-            cp_values = cp_values.to_list()
-
-        # check the length of cp_values == num_slots
-        num_slots = max(len(obj.blender_obj.material_slots), 1)
-        if isinstance(cp_values, list):
-            assert len(cp_values) == num_slots
-        else:
-            cp_values = [cp_values] * num_slots
-        return cp_values
-
-    groups = defaultdict(list)
-    for obj in objs:
-        name = obj.get_name()
-        num_slots = max(len(obj.blender_obj.material_slots), 1)
-
-        # grouping by group_cp_name
-        # 1. if the cp is not defined, make every slot as an individual group
-        # 2. if the cp_value is a single value, broadcast to every slot
-        # 3. if the cp_value is a list, use it directly.
-        default_value = [f"{name}_{i}" for i in range(num_slots)]
-        group_cp_values: list[str] = get_cp_(obj, group_cp_name, default=default_value)
-
-        # filtering by filter_cp_name
-        # 1. if the cp is not defined, make every slot require randomization
-        # 2. if the cp_value is a single value, broadcast to every slot
-        # 3. if the cp_value is a list, use it directly.
-        default_value = [True] * num_slots
-        filter_cp_values: list[bool] = get_cp_(
-            obj, filter_cp_name, default=default_value
-        )
-
-        for i, group_cp in filter(
-            lambda item: filter_cp_values[item[0]], enumerate(group_cp_values)
-        ):
-            groups[group_cp].append((obj, i))
-    return groups
-
-
-def randomize_drone_properties(
-    uav_model: MeshObject,
-    material_slots_groups: dict[str, list[tuple[MeshObject, int]]],
-    materials: list[Material],
-    x_range: tuple[int, int],
-    y_range: tuple[int, int],
-    z_range: tuple[int, int],
-):
-    # randomly sample a frame for animation
-    frame = random.randint(0, 249)
-
-    # set the current frame in order to get the correct animtation to let the camera fit the object
-    bpy.context.scene.frame_set(frame)
-
-    # randomly sample an euler angle
-    euler = rand_rotation_euler(x_range, y_range, z_range)
-    uav_model.set_rotation_euler(euler, frame=frame)
-
-    # randomly apply a material for each group
-    for material_slots in material_slots_groups.values():
-        material = random.choice(materials)
-        for mesh, i in material_slots:
-            if mesh.has_materials():
-                mesh.set_material(i, material)
-            else:
-                assert (
-                    i == 0
-                ), "The index of material slot must be 0 because there is no material slots in object."
-                mesh.add_material(material)
-
-    return frame
-
-
-def adjust_camera_pose(frame: int, backward_amount: float = 0.3):
-    camera = bpy.context.scene.camera
-    # align the camera view to fit the UAV model
-    bpy.ops.view3d.camera_to_view_selected()
-
-    # move the camera backward about 0.3m along local Z-axis (0, 0, 1)
-    # by default, the camera view direction is local -Z axis in blender.
-    # so, we just take the local Z-axis. (move backward)
-    translate_axis(camera, "Z", backward_amount)
-
-    # set the camera pose
-    bproc.camera.add_camera_pose(camera.matrix_world, frame=frame)
-
-
 def generate_uav_samples(
     uav_models: list[list[MeshObject]],
     materials: list[Material],
-    x_range: tuple[int, int],
-    y_range: tuple[int, int],
-    z_range: tuple[int, int],
+    x_range: tuple[int, int] = (-45, 45),
+    y_range: tuple[int, int] = (-45, 45),
+    z_range: tuple[int, int] = (0, 360),
+    adaptive_alignment: bool = True,
+    alignment_z_offset: float = 0,
+    alignment_z_step: float = 0.1,
+    motion_blur: bool = True,
 ):
     # cache the original state of animtations
     original_action_keys = bpy.data.actions.keys()
@@ -278,16 +212,28 @@ def generate_uav_samples(
             visibility = get_cp(uav_component, "visibility", default=True)
             uav_component.hide(not visibility)
 
-        # select current UAV model
-        select_object(uav_model)
-
         # get material slots which require material_randomization
         material_slots_groups = group_and_filter_material_slots_by_cp(uav_components)
 
+        # randomize the material and rotation
         frame = randomize_drone_properties(
-            uav_model, material_slots_groups, materials, x_range, y_range, z_range
+            uav_model,
+            material_slots_groups,
+            materials,
+            x_range=x_range,
+            y_range=y_range,
+            z_range=z_range,
         )
-        adjust_camera_pose(frame, backward_amount=0.3)
+
+        # align the camera with the UAV
+        align_camera_pose(
+            frame,
+            uav_components,
+            adaptive_alignment=adaptive_alignment,
+            alignment_z_offset=alignment_z_offset,
+            alignment_z_step=alignment_z_step,
+            motion_blur=motion_blur,
+        )
 
         # render the whole pipeline
         bproc.utility.set_keyframe_render_interval(frame_start=frame)
@@ -303,41 +249,45 @@ def generate_uav_samples(
         yield image
 
 
-def get_scaled_uav_size(
+def sample_uav_size(
     scale_range: tuple[float, float],
     image_size: tuple[int, int],
     uav_size: tuple[int, int],
+    allow_upscaling: bool = False,
 ) -> tuple[int, int]:
     image_total_size = image_size[0] * image_size[1]
     uav_total_size = uav_size[0] * uav_size[1]
 
     # randomly sample a scale_ratio
-    for _ in range(50):
-        scale_ratio = random.uniform(*scale_range)
+    scale_ratio = random.uniform(*scale_range)
+    scaled_image_total_size = image_total_size * scale_ratio
 
-        # avoid upscaling becuse we don't constrain the original size
-        if (image_total_size * scale_ratio) <= uav_total_size:
-            # calculate scaled width, height
-            # w * r, h * r = (W, H)
-            # w * h * r^2 ~= image_total_size * scale_ratio
-            # r = sqrt(image_total_size * scale_ratio / uav_total_size)
-            uav_scale_ratio = sqrt(image_total_size * scale_ratio / uav_total_size)
+    # if not allow upscaling, then raise exception if larger than the original size
+    if not allow_upscaling and scaled_image_total_size > uav_total_size:
+        raise RuntimeError(
+            f"Cannot find an ideal scale fitting the range {scale_range}."
+        )
 
-            # round to the closet integer & round half to even (default rounding mode in IEEE 754)
-            return round(uav_size[0] * uav_scale_ratio), round(
-                uav_size[1] * uav_scale_ratio
-            )
+    # calculate scaled width, height
+    # w * r, h * r = (W, H)
+    # w * h * r^2 ~= image_total_size * scale_ratio
+    # r = sqrt(image_total_size * scale_ratio / uav_total_size)
+    uav_scale_ratio = sqrt(scaled_image_total_size / uav_total_size)
 
-    raise RuntimeError(f"Cannot find an ideal scale fitting the range {scale_range}.")
+    # round to the closet integer & round half to even (default rounding mode in IEEE 754)
+    return round(uav_size[0] * uav_scale_ratio), round(uav_size[1] * uav_scale_ratio)
 
 
 def scale_uav(
     uav_image: Image.Image,
     scale_range: tuple[float, float],
     image_size: tuple[int, int],
+    allow_upscaling: bool = False,
 ) -> Image.Image:
     # determine the scaled size of UAV object
-    scaled_uav_size = get_scaled_uav_size(scale_range, image_size, uav_image.size)
+    scaled_uav_size = sample_uav_size(
+        scale_range, image_size, uav_image.size, allow_upscaling=allow_upscaling
+    )
 
     # scale the UAV
     # Filter comparison: https://pillow.readthedocs.io/en/stable/handbook/concepts.html#filters-comparison-table
@@ -345,7 +295,7 @@ def scale_uav(
     return uav_image
 
 
-def get_uav_location(
+def sample_uav_location(
     image_size: tuple[int, int],
     uav_size: tuple[int, int],
     bboxes: list[tuple[int, int, int, int]],
@@ -363,7 +313,7 @@ def get_uav_location(
         if (ious <= max_iou).all():
             return x, y
 
-    warnings.warn(f"Cannot find an ideal location fitting the maximum IoU {max_iou}.")
+    print(f"Warning! Cannot find an ideal location fitting the maximum IoU {max_iou}.")
     return None
 
 
@@ -376,8 +326,12 @@ def main(
     y_range: tuple[int, int] = (-45, 45),
     z_range: tuple[int, int] = (0, 360),
     max_samples: int = 20,
-    scale_range: tuple[float, float] = (0.2, 0.8),
     max_iou: float = 0.5,
+    scale_range: tuple[float, float] = (0.2, 0.8),
+    allow_upscaling: bool = False,
+    adaptive_alignment: bool = True,
+    alignment_z_offset: float = 0,
+    alignment_z_step: float = 0.1,
     motion_blur: bool = True,
     render_resolution: tuple[int, int] = (1920, 1920),
     render_max_samples: int = 1024,
@@ -408,13 +362,17 @@ def main(
     camera.rotation_euler = Euler((radians(90), 0, 0))
     bpy.context.view_layer.update()
 
+    # prepare COCO writer
+    coco_writer = COCOWriter()
+    category_id = coco_writer.add_category("drone", "UAV")
+
     images_dir = os.path.join(out_dir, "images")
     annotations_dir = os.path.join(out_dir, "annotations")
-    coco_writer = COCOWriter()
+    uav_models = list(uav_models.values())
     for image_path in image_paths:
         # determine how many samples should be generated
         num_samples = random.randint(1, max_samples)
-        selected_models = random.choices(list(uav_models.values()), k=num_samples)
+        selected_models = random.choices(uav_models, k=num_samples)
 
         # create an foreground image with the same size as the image
         background_image = Image.open(image_path)
@@ -424,30 +382,43 @@ def main(
         uav_images: list[Image.Image] = []
         uav_bboxes: list[tuple[int, int, int, int]] = []
         image_size = foreground_image.size
-        for rendered_image in generate_uav_samples(
-            selected_models, materials, x_range, y_range, z_range
-        ):
+        uav_generator = generate_uav_samples(
+            selected_models,
+            materials,
+            x_range=x_range,
+            y_range=y_range,
+            z_range=z_range,
+            adaptive_alignment=adaptive_alignment,
+            alignment_z_offset=alignment_z_offset,
+            alignment_z_step=alignment_z_step,
+            motion_blur=motion_blur,
+        )
+        for uav_image in uav_generator:
             # utilize the alpha channel to find the bbox
-            x1, y1, x2, y2 = find_bbox_xyxy_by_alpha(rendered_image)
+            x1, y1, x2, y2 = find_bbox_xyxy_by_alpha(uav_image)
 
             # cut the image by bbox to get the actual size of UAV object
-            uav_image = rendered_image[y1:y2, x1:x2]
+            uav_image = uav_image[y1:y2, x1:x2]
             uav_image = Image.fromarray(uav_image, "RGBA")
 
             # scale UAV
-            uav_image = scale_uav(uav_image, scale_range, image_size)
+            uav_image = scale_uav(
+                uav_image, scale_range, image_size, allow_upscaling=allow_upscaling
+            )
 
             # determine the location of UAV on the foreground image
-            uav_location = get_uav_location(
+            uav_location = sample_uav_location(
                 image_size, uav_image.size, uav_bboxes, max_iou=max_iou
             )
             # if it returns None, stop generating. (no space)
             if uav_location is None:
-                print(f"Total UAVs: {len(uav_bboxes)}. Skipping...")
+                print("Skipping...", end="")
                 break
 
             uav_images.append(uav_image)
             uav_bboxes.append((*uav_location, *uav_image.size))
+
+        print(f"Success: {len(uav_bboxes)} of {num_samples}.")
 
         # paste UAVs starting from the most distant UAV
         # sort by uav_size
@@ -464,7 +435,7 @@ def main(
 
         # add image info to COCOWriter
         image_id = coco_writer.add_image(out_file, *foreground_image.size)
-        coco_writer.add_annotations(image_id, 1, uav_bboxes)
+        coco_writer.add_annotations(image_id, category_id, uav_bboxes)
 
         # save the foreground image
         out_file = os.path.join(images_dir, out_file)
