@@ -1,5 +1,6 @@
 diffusers[torch] < 5.0.0
 transformers < 5.0.0
+safetensors
 controlnet-aux
 ipywidgets
 ipykernel
@@ -13,3 +14,4 @@ fastdup; sys_platform != "win32"
 bpy ~= 3.5.0
 fake-bpy-module-3.5
 blenderproc < 3.0.0
+pillow
