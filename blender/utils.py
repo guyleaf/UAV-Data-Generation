@@ -10,8 +10,8 @@ import blenderproc as bproc
 import bpy
 import numpy as np
 from blenderproc.api.types import Entity, MeshObject, Struct
-from blenderproc.python.utility.Utility import KeyFrame
 from bpy_extras.object_utils import world_to_camera_view
+from frame import Frame
 from mathutils import Euler, Matrix, Vector
 
 AXIS = {
@@ -203,10 +203,17 @@ def is_vertex_in_camera_view(vertex: Union[np.ndarray, Vector]) -> bool:
     )
 
 
-def are_all_meshes_in_camera_view(meshes: list[MeshObject], frames: list[int]):
+def are_all_meshes_in_camera_view(
+    meshes: list[MeshObject], frames: list[Union[int, tuple[int, float]]]
+):
     result = True
     for frame in frames:
-        with KeyFrame(frame):
+        if isinstance(frame, tuple):
+            frame, subframe = frame
+        else:
+            frame, subframe = frame, 0
+
+        with Frame(frame, subframe=subframe):
             vertices = [mesh.get_bound_box() for mesh in meshes]
             vertices = np.concatenate(vertices, axis=0)
         result = result and all(map(is_vertex_in_camera_view, vertices))

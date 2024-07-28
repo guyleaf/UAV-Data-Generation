@@ -258,41 +258,27 @@ def sample_uav_size(
     image_total_size = image_size[0] * image_size[1]
     uav_total_size = uav_size[0] * uav_size[1]
 
-    # randomly sample a scale_ratio
-    scale_ratio = random.uniform(*scale_range)
-    scaled_image_total_size = image_total_size * scale_ratio
+    for _ in range(50):
+        # randomly sample a scale_ratio
+        scale_ratio = random.uniform(*scale_range)
+        scaled_image_total_size = image_total_size * scale_ratio
 
-    # if not allow upscaling, then raise exception if larger than the original size
-    if not allow_upscaling and scaled_image_total_size > uav_total_size:
-        raise RuntimeError(
-            f"Cannot find an ideal scale fitting the range {scale_range}."
+        # if not allow upscaling, then raise exception if larger than the original size
+        if not allow_upscaling and scaled_image_total_size > uav_total_size:
+            continue
+
+        # calculate scaled width, height
+        # w * r, h * r = (W, H)
+        # w * h * r^2 ~= image_total_size * scale_ratio
+        # r = sqrt(image_total_size * scale_ratio / uav_total_size)
+        uav_scale_ratio = sqrt(scaled_image_total_size / uav_total_size)
+
+        # round to the closet integer & round half to even (default rounding mode in IEEE 754)
+        return round(uav_size[0] * uav_scale_ratio), round(
+            uav_size[1] * uav_scale_ratio
         )
 
-    # calculate scaled width, height
-    # w * r, h * r = (W, H)
-    # w * h * r^2 ~= image_total_size * scale_ratio
-    # r = sqrt(image_total_size * scale_ratio / uav_total_size)
-    uav_scale_ratio = sqrt(scaled_image_total_size / uav_total_size)
-
-    # round to the closet integer & round half to even (default rounding mode in IEEE 754)
-    return round(uav_size[0] * uav_scale_ratio), round(uav_size[1] * uav_scale_ratio)
-
-
-def scale_uav(
-    uav_image: Image.Image,
-    scale_range: tuple[float, float],
-    image_size: tuple[int, int],
-    allow_upscaling: bool = False,
-) -> Image.Image:
-    # determine the scaled size of UAV object
-    scaled_uav_size = sample_uav_size(
-        scale_range, image_size, uav_image.size, allow_upscaling=allow_upscaling
-    )
-
-    # scale the UAV
-    # Filter comparison: https://pillow.readthedocs.io/en/stable/handbook/concepts.html#filters-comparison-table
-    uav_image = uav_image.resize(scaled_uav_size, Image.LANCZOS)
-    return uav_image
+    raise RuntimeError(f"Cannot find an ideal scale fitting the range {scale_range}.")
 
 
 def sample_uav_location(
@@ -366,7 +352,7 @@ def main(
     coco_writer = COCOWriter()
     category_id = coco_writer.add_category("drone", "UAV")
 
-    images_dir = os.path.join(out_dir, "images")
+    images_dir = os.path.join(out_dir, "foregrounds")
     annotations_dir = os.path.join(out_dir, "annotations")
     uav_models = list(uav_models.values())
     for image_path in image_paths:
@@ -457,7 +443,7 @@ def main(
 
     # save annotations in COCO format
     os.makedirs(annotations_dir, exist_ok=True)
-    out_file = os.path.join(annotations_dir, "all.json")
+    out_file = os.path.join(annotations_dir, "foreground.json")
     coco_writer.export(out_file)
 
 

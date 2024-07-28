@@ -128,7 +128,8 @@ def align_camera_pose(
         # if motion_blur is enabled, we also need to check the previous and next frame
         frames = [frame]
         if motion_blur:
-            frames += [frame - 1, frame + 1]
+            half_shutter = bpy.context.scene.render.motion_blur_shutter / 2
+            frames += [(frame - 1, 1 - half_shutter), (frame, half_shutter)]
 
         # check if all vertices of UAV are in the camera
         while not are_all_meshes_in_camera_view(uav_components, frames):
