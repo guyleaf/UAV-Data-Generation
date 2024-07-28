@@ -4,6 +4,7 @@ from types import TracebackType
 from typing import Optional, Type
 
 import bpy
+from blenderproc.python.utility.Utility import KeyFrame
 
 
 class _FrameState(threading.local):
@@ -31,6 +32,11 @@ class Frame:
         :param frame: The frame number to set. If None is given, nothing is changed.
         :param subframe: The subframe number to set.
         """
+        if KeyFrame.is_any_active():
+            raise RuntimeError(
+                "You cannot use the Frame and KeyFrame interchangeably under the same parent context."
+            )
+
         self._frame = frame
         self._subframe = subframe
         self._prev_frame = None
