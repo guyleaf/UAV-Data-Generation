@@ -10,7 +10,7 @@ from collections import defaultdict
 import idprop
 from blenderproc.python.types.MaterialUtility import Material
 from blenderproc.python.types.MeshObjectUtility import MeshObject
-from blenderproc.python.utility.Utility import KeyFrame
+from utils import Frame
 
 sys.path.append(os.path.dirname(__file__))
 
@@ -111,7 +111,7 @@ def align_camera_pose(
     select_objects(uav_components)
 
     # including the animation
-    with KeyFrame(frame):
+    with Frame(frame):
         # align the camera view to fit the UAV model
         # note: only the location will be modified.
         bpy.ops.view3d.camera_to_view_selected()

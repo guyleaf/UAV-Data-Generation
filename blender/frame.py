@@ -1,25 +1,40 @@
 import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the top due to the check of blenderproc
+import threading
 from types import TracebackType
 from typing import Optional, Type
 
 import bpy
-from blenderproc.python.utility.Utility import KeyFrame
 
 
-# must inherit from KeyFrame to track the context correctly
-class Frame(KeyFrame):
+class _FrameState(threading.local):
     """
-    A content manager for setting the frame and subframe correctly.
+    This class is only used in the KeyFrame class
     """
 
-    def __init__(self, frame: int, subframe: float = 0):
+    def __init__(self):
+        super().__init__()
+        self.depth = 0
+
+
+class Frame:
+    """
+    A context manager for setting the frame and subframe correctly.
+
+    Notice: You cannot use the Frame and KeyFrame interchangeably under the same parent context.
+    """
+
+    state = _FrameState()
+
+    def __init__(self, frame: Optional[int], subframe: float = 0):
         """Sets the frame number for its complete block.
 
         :param frame: The frame number to set. If None is given, nothing is changed.
+        :param subframe: The subframe number to set.
         """
-        super().__init__(frame)
+        self._frame = frame
         self._subframe = subframe
-        self._prev_subframe = None
+        self._prev_frame = None
+        self._prev_subframe = 0
 
     def __enter__(self):
         Frame.state.depth += 1
@@ -38,12 +53,31 @@ class Frame(KeyFrame):
         if self._prev_frame is not None:
             bpy.context.scene.frame_set(self._prev_frame, subframe=self._prev_subframe)
 
+    @staticmethod
+    def is_any_active() -> bool:
+        """Returns whether the current execution point is surrounded by a Frame context manager.
+
+        :return: True, if there is at least one surrounding Frame context manager
+        """
+        return Frame.state.depth > 0
+
 
 if __name__ == "__main__":
-    print(Frame.state.depth, KeyFrame.state.depth)
-    with Frame(1):
-        print(Frame.state.depth, KeyFrame.state.depth)
-        with KeyFrame(3):
-            print(Frame.state.depth, KeyFrame.state.depth)
-        print(Frame.state.depth, KeyFrame.state.depth)
-    print(Frame.state.depth, KeyFrame.state.depth)
+    scene = bpy.context.scene
+    print(f"Depth: {Frame.state.depth}")
+    print(f"Current Frame: ({scene.frame_current}, {scene.frame_subframe})")
+    with Frame(2, 0.6):
+        print(f"Depth: {Frame.state.depth}")
+        print(f"Current Frame: ({scene.frame_current}, {scene.frame_subframe})")
+        with Frame(3, 0.5):
+            print(f"Depth: {Frame.state.depth}")
+            print(f"Current Frame: ({scene.frame_current}, {scene.frame_subframe})")
+        print(f"Depth: {Frame.state.depth}")
+        print(f"Current Frame: ({scene.frame_current}, {scene.frame_subframe})")
+        with Frame(4):
+            print(f"Depth: {Frame.state.depth}")
+            print(f"Current Frame: ({scene.frame_current}, {scene.frame_subframe})")
+        print(f"Depth: {Frame.state.depth}")
+        print(f"Current Frame: ({scene.frame_current}, {scene.frame_subframe})")
+    print(f"Depth: {Frame.state.depth}")
+    print(f"Current Frame: ({scene.frame_current}, {scene.frame_subframe})")
