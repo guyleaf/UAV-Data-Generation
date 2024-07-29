@@ -107,6 +107,8 @@ def align_camera_pose(
     alignment_z_step: float = 0.1,
     motion_blur: bool = True,
 ):
+    camera = bpy.context.scene.camera
+
     # select current UAV model
     select_objects(uav_components)
 
@@ -119,7 +121,6 @@ def align_camera_pose(
     # move the camera backward along local Z-axis (0, 0, 1)
     # by default, the camera view direction is local -Z axis in blender.
     # so, we just take the local Z-axis. (move backward)
-    camera = bpy.context.scene.camera
     z_offset = alignment_z_offset
     translate_axis(camera, "Z", z_offset)
 
@@ -134,8 +135,8 @@ def align_camera_pose(
         # check if all vertices of UAV are in the camera
         while not are_all_meshes_in_camera_view(uav_components, frames):
             z_offset += alignment_z_step
-            print(f"[Adaptive alignment] Retrying to move backward... {z_offset:.3f}m")
             translate_axis(camera, "Z", alignment_z_step)
+        print(f"[Adaptive alignment] Retrying to move backward... {z_offset:.3f}m")
 
     # set the camera pose
     bproc.camera.add_camera_pose(camera.matrix_world, frame=frame)

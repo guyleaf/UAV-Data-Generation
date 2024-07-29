@@ -244,7 +244,7 @@ def main(
                 # write the color to a .png container in the run-specific output directory
                 out_path = os.path.join(out_dir, name)
                 os.makedirs(out_path, exist_ok=True)
-                image.save(os.path.join(out_path, f"{i}_{frame}_{z_offset:.3f}.png"))
+                image.save(os.path.join(out_path, f"{i}_{frame}_{z_offset:.3f}m.png"))
 
             # reset keyframes
             reset_keyframes(original_action_keys)

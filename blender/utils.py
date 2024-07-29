@@ -59,6 +59,7 @@ def setup(
     objs = bproc.loader.load_blend(
         scene_path, obj_types=["mesh", "light"], data_blocks=["objects", "materials"]
     )
+    objs: list[Entity] = bproc.filter.all_with_type(objs, filtered_data_type=Entity)
 
     # Setup scene settingss
     bpy.context.scene.render.fps = 60
@@ -85,10 +86,9 @@ def setup(
     assert len(uav_models) > 0, "UAV model is not found."
     print("\nFind", len(uav_models), "UAV models")
 
-    # hide all uav components and set categorid_id to 0 as drone category
-    for uav_components in uav_models.values():
-        for uav_component in uav_components:
-            uav_component.hide()
+    # hide all objects by default
+    for obj in objs:
+        obj.hide()
 
     return objs, uav_models
 
