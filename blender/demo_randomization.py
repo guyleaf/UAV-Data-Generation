@@ -233,17 +233,18 @@ def main(
             # render the whole pipeline
             bproc.utility.set_keyframe_render_interval(frame_start=frame)
             data = bproc.renderer.render()
-            color = data["colors"][0]
-            image = Image.fromarray(color, mode="RGBA")
+            for j, color in enumerate(data["colors"]):
+                frame = bpy.context.scene.frame_start + j
+                image = Image.fromarray(color, mode="RGBA")
 
-            # visualize with the bounding box
-            bbox = find_bbox_xyxy_by_alpha(color)
-            draw_bounding_box(image, bbox)
+                # visualize with the bounding box
+                bbox = find_bbox_xyxy_by_alpha(color)
+                draw_bounding_box(image, bbox)
 
-            # write the color to a .png container in the run-specific output directory
-            out_path = os.path.join(out_dir, name)
-            os.makedirs(out_path, exist_ok=True)
-            image.save(os.path.join(out_path, f"{i}_{frame}_{z_offset:.3f}.png"))
+                # write the color to a .png container in the run-specific output directory
+                out_path = os.path.join(out_dir, name)
+                os.makedirs(out_path, exist_ok=True)
+                image.save(os.path.join(out_path, f"{i}_{frame}_{z_offset:.3f}.png"))
 
             # reset keyframes
             reset_keyframes(original_action_keys)
