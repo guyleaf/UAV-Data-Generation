@@ -1,27 +1,35 @@
 {
 	"folders": [
 		{
+			"name": "UAV-Data-Generation",
 			"path": "."
 		},
 		{
+			"name": "work_dirs",
 			"path": "../../work/work_dirs"
 		},
 		{
+			"name": "experiments",
 			"path": "../../work/experiments"
 		},
 		{
+			"name": "checkpoints",
 			"path": "../../data/checkpoints"
 		},
 		{
+			"name": "IC-Light",
 			"path": "../IC-Light"
 		},
 		{
+			"name": "PIH",
 			"path": "../PIH"
 		},
 		{
-			"path": "../AnyDoor"
+			"name": "neural-style-pt",
+			"path": "../neural-style-pt"
 		},
 		{
+			"name": "archive",
 			"path": "../../archive"
 		}
 	]
