@@ -289,10 +289,16 @@ def sample_uav_location(
 ) -> Optional[tuple[int, int]]:
     end_w, end_h = image_size[0] - uav_size[0], image_size[1] - uav_size[1]
 
+    if end_w < 0 or end_h < 0:
+        print(
+            f"Warning! Cannot find an ideal location fitting the UAV size {uav_size}."
+        )
+        return None
+
     for _ in range(50):
         # randomly sample a position from image based on the actual size
-        x = random.randint(0, max(end_w, 0))
-        y = random.randint(0, max(end_h, 0))
+        x = random.randint(0, end_w)
+        y = random.randint(0, end_h)
 
         # check if there is no overlap (or below the overlap threshold) among bboxes list
         ious = bbox_overlaps([[x, y, *uav_size]], bboxes)
