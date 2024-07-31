@@ -66,6 +66,7 @@ def setup(
     bproc.camera.set_resolution(*resolution)
     bproc.renderer.set_output_format(enable_transparency=True)
     bproc.renderer.set_max_amount_of_samples(max_samples)
+    bproc.renderer.set_noise_threshold(0.01)
     bpy.context.scene.cycles.tile_size = tile_size
 
     if motion_blur:

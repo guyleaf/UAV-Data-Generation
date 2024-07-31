@@ -227,7 +227,6 @@ def main(
                 adaptive_alignment=adaptive_alignment,
                 alignment_z_offset=alignment_z_offset,
                 alignment_z_step=alignment_z_step,
-                motion_blur=motion_blur,
             )
 
             # render the whole pipeline

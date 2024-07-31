@@ -79,10 +79,10 @@ def parse_args():
         help="The maximum number of UAVs per image.",
     )
     parser.add_argument(
-        "--max-iou",
+        "--max-iof",
         type=float,
         default=0.2,
-        help="The maximum IoU among UAVs in image. (max_iou > 0 -> accept occlusion)",
+        help="The maximum IoF (check overlap / bbox1 & overlap / bbox2) among UAVs in image. (max_iof > 0 -> accept occlusion)",
     )
     parser.add_argument(
         "--scale-range",
@@ -186,7 +186,7 @@ def parse_args():
     assert (
         0 < args.scale_range[0] <= args.scale_range[1] <= 1
     ), "The scale range should be in (0, 1]."
-    assert 0 <= args.max_iou <= 1, "The maximum IoU should be in (0, 1)."
+    assert 0 <= args.max_iof <= 1, "The maximum IoF should be in (0, 1)."
     return args
 
 
@@ -199,7 +199,6 @@ def generate_uav_samples(
     adaptive_alignment: bool = True,
     alignment_z_offset: float = 0,
     alignment_z_step: float = 0.1,
-    motion_blur: bool = True,
 ):
     # cache the original state of animtations
     original_action_keys = bpy.data.actions.keys()
@@ -232,7 +231,6 @@ def generate_uav_samples(
             adaptive_alignment=adaptive_alignment,
             alignment_z_offset=alignment_z_offset,
             alignment_z_step=alignment_z_step,
-            motion_blur=motion_blur,
         )
 
         # render the whole pipeline
@@ -285,7 +283,7 @@ def sample_uav_location(
     image_size: tuple[int, int],
     uav_size: tuple[int, int],
     bboxes: list[tuple[int, int, int, int]],
-    max_iou: float = 0,
+    max_iof: float = 0,
 ) -> Optional[tuple[int, int]]:
     end_w, end_h = image_size[0] - uav_size[0], image_size[1] - uav_size[1]
 
@@ -301,11 +299,13 @@ def sample_uav_location(
         y = random.randint(0, end_h)
 
         # check if there is no overlap (or below the overlap threshold) among bboxes list
-        ious = bbox_overlaps([[x, y, *uav_size]], bboxes)
-        if (ious <= max_iou).all():
+        bbox = [[x, y, *uav_size]]
+        iofs1 = bbox_overlaps(bbox, bboxes, mode="iof")
+        iofs2 = bbox_overlaps(bboxes, bbox, mode="iof")
+        if (iofs1 <= max_iof).all() and (iofs2 <= max_iof).all():
             return x, y
 
-    print(f"Warning! Cannot find an ideal location fitting the maximum IoU {max_iou}.")
+    print(f"Warning! Cannot find an ideal location fitting the maximum IoF {max_iof}.")
     return None
 
 
@@ -318,7 +318,7 @@ def main(
     y_range: tuple[int, int] = (-45, 45),
     z_range: tuple[int, int] = (0, 360),
     max_samples: int = 20,
-    max_iou: float = 0.5,
+    max_iof: float = 0.5,
     scale_range: tuple[float, float] = (0.2, 0.8),
     allow_upscaling: bool = False,
     adaptive_alignment: bool = True,
@@ -383,7 +383,6 @@ def main(
             adaptive_alignment=adaptive_alignment,
             alignment_z_offset=alignment_z_offset,
             alignment_z_step=alignment_z_step,
-            motion_blur=motion_blur,
         )
         for uav_image in uav_generator:
             # utilize the alpha channel to find the bbox
@@ -405,7 +404,7 @@ def main(
 
                 # determine the location of UAV on the foreground image
                 uav_location = sample_uav_location(
-                    image_size, scaled_uav_size, uav_bboxes, max_iou=max_iou
+                    image_size, scaled_uav_size, uav_bboxes, max_iof=max_iof
                 )
                 if uav_location is not None:
                     break
@@ -429,7 +428,7 @@ def main(
         indices.sort(key=lambda i: uav_bboxes[i][2] * uav_bboxes[i][3])
         for i in indices:
             uav_image, bbox = uav_images[i], uav_bboxes[i]
-            foreground_image.paste(uav_image, box=bbox[:2], mask=uav_image)
+            foreground_image.alpha_composite(uav_image, dest=bbox[:2])
 
         # get output path
         rel_path = os.path.relpath(os.path.dirname(image_path), images_path)

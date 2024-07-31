@@ -105,7 +105,6 @@ def align_camera_pose(
     adaptive_alignment: bool = True,
     alignment_z_offset: float = 0,
     alignment_z_step: float = 0.1,
-    motion_blur: bool = True,
 ):
     camera = bpy.context.scene.camera
 
@@ -128,7 +127,7 @@ def align_camera_pose(
     if adaptive_alignment:
         # if motion_blur is enabled, we also need to check the previous and next frame
         frames = [frame]
-        if motion_blur:
+        if bpy.context.scene.render.use_motion_blur:
             half_shutter = bpy.context.scene.render.motion_blur_shutter / 2
             frames += [(frame - 1, 1 - half_shutter), (frame, half_shutter)]
 
