@@ -16,8 +16,9 @@ def parse_args():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        "root_dir",
+        "root_dirs",
         type=str,
+        nargs="+",
         help="root directory of datasets, if only one root dir, the script will clean it in in-place operation.",
     )
     parser.add_argument(
@@ -58,7 +59,7 @@ def clean_dataset(root_dir: Path, duplicated_dir: Path, dry_run: bool = False):
     number_of_images = 0
     number_of_duplicates = 0
     for file in tqdm.tqdm(
-        glob.iglob(str(root_dir / "**"), recursive=True), desc="Target"
+        glob.iglob(str(root_dir / "**/*.*"), recursive=True), desc="Target"
     ):
         mime_type = mime_checker.guess_type(file)[0]
         if mime_type is None or "image" not in mime_type:
@@ -71,7 +72,7 @@ def clean_dataset(root_dir: Path, duplicated_dir: Path, dry_run: bool = False):
             number_of_duplicates += 1
             if not dry_run:
                 rel_path = Path(file).relative_to(root_dir).parent
-                target_dir = duplicated_dir / rel_path
+                target_dir = duplicated_dir / root_dir.name / rel_path
                 target_dir.mkdir(parents=True, exist_ok=True)
                 shutil.move(file, target_dir)
 
@@ -91,7 +92,7 @@ def clean_datasets(
     image_hashes_to_files = defaultdict(list)
     number_of_images = 0
     for file in tqdm.tqdm(
-        glob.iglob(str(root_dir / "**"), recursive=True), desc="Target"
+        glob.iglob(str(root_dir / "**/*.*"), recursive=True), desc="Target"
     ):
         mime_type = mime_checker.guess_type(file)[0]
         if mime_type is None or "image" not in mime_type:
@@ -107,7 +108,7 @@ def clean_datasets(
     number_of_duplicates = 0
     for root_dir in root_dirs:
         for file in tqdm.tqdm(
-            glob.iglob(str(root_dir / "**"), recursive=True), desc="Others"
+            glob.iglob(str(root_dir / "**/*.*"), recursive=True), desc="Others"
         ):
             mime_type = mime_checker.guess_type(file)[0]
             if mime_type is None or "image" not in mime_type:
@@ -120,11 +121,12 @@ def clean_datasets(
                 number_of_duplicates += 1
                 if not dry_run:
                     rel_path = Path(file).relative_to(root_dir).parent
-                    target_dir = duplicated_dir / rel_path
+                    target_dir = duplicated_dir / root_dir.name / rel_path
                     target_dir.mkdir(parents=True, exist_ok=True)
                     shutil.move(file, target_dir)
 
             image_hashes_to_files[image_hash].append(file)
+            number_of_images += 1
     return number_of_images, number_of_duplicates, image_hashes_to_files
 
 
@@ -144,6 +146,7 @@ if __name__ == "__main__":
         )
 
     print("Total images:", number_of_images)
+    print("Total uniques:", number_of_images - number_of_duplicates)
     print("Total duplicates:", number_of_duplicates)
 
     if args.verbose:
