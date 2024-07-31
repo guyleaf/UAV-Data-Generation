@@ -3,13 +3,12 @@ import os
 import shutil
 from mimetypes import MimeTypes
 
-import PIL.Image as Image
 import tqdm
 from utils import split_into_train_val
 
 WEATHER_MAP = {
-    "rainy": "rainy",
-    "snowy": "snowy",
+    "rain": "rainy",
+    "snow": "snowy",
     "sunny": "clear",
     "cloudy": "cloudy",
     "foggy": "foggy",
@@ -18,7 +17,7 @@ WEATHER_MAP = {
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="A script for preparing the FWID dataset",
+        description="A script for preparing the Image2Weather dataset",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
@@ -44,7 +43,7 @@ def parse_args():
     return args
 
 
-def prepare_fwid_dataset(
+def prepare_image2weather_dataset(
     root_dir: str,
     out_dir: str,
     val_ratio: float = 0.1,
@@ -92,24 +91,8 @@ def prepare_fwid_dataset(
 
         counter = {label: 0 for label in labels}
         for image in tqdm.tqdm(images, desc=f"{subset.capitalize()} images"):
-            image_name = os.path.basename(image)
-            image_name_without_ext = os.path.splitext(image_name)[0]
-
             label = image_files[image]
-            target_dir = os.path.join(subset_dir, label)
-
-            # some images are not in jpg format but extension is .jpg or jfif_version is wrong
-            # save it to png format (rewrite the image to avoid 'libpng warning: sBIT: invalid' or 'Warning: unknown JFIF revision number 32.23')
-            with Image.open(image) as img:
-                if img.format == "JPEG" and img.info.get("jfif_version") != (32, 23):
-                    shutil.copy2(image, target_dir)
-                else:
-                    img.save(
-                        os.path.join(target_dir, f"{image_name_without_ext}.png"),
-                        icc_profile=img.info.get("icc_profile"),
-                        exif=img.info.get("exif"),
-                    )
-
+            shutil.copy2(image, os.path.join(subset_dir, label))
             counter[label] += 1
 
         print(subset.capitalize())
@@ -119,7 +102,7 @@ def prepare_fwid_dataset(
 
 if __name__ == "__main__":
     args = parse_args()
-    prepare_fwid_dataset(
+    prepare_image2weather_dataset(
         args.root_dir,
         args.out_dir,
         val_ratio=args.val_ratio,
