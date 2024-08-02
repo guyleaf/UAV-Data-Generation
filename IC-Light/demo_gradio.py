@@ -40,6 +40,8 @@ def parse_args():
         help="GPU device id will be used for demo",
     )
     args = parser.parse_args()
+    args.fg = os.path.expanduser(args.fg)
+    args.bg = os.path.expanduser(args.bg)
     return args
 
 
@@ -57,7 +59,7 @@ def handle_process_relight(inferencer: ICLightInferencer):
         highres_denoise: float,
         bg_source: str,
     ):
-        image_height, image_width = input_fg
+        image_height, image_width = input_fg.shape[:2]
         bg_source = BGSource(bg_source)
 
         if bg_source == BGSource.UPLOAD:
@@ -87,8 +89,10 @@ def handle_process_relight(inferencer: ICLightInferencer):
         else:
             raise "Wrong background source!"
 
-        if input_fg.shape != input_bg.shape:
-            raise gr.Error("The foreground and background image should be the same!")
+        if input_fg.shape[:2] != input_bg.shape[:2]:
+            raise gr.Error(
+                "The size of foreground and background image should be the same!"
+            )
 
         result, extra_images = inferencer(
             input_fg,
@@ -117,18 +121,19 @@ if __name__ == "__main__":
     )
 
     # prepare examples
-    subsets = os.listdir(args.fg)
+    # subsets = os.listdir(args.fg)
     examples: dict[str, list] = {}
-    for subset in subsets:
-        fg = os.path.join(args.fg, subset)
-        bg = os.path.join(args.bg, subset)
-        examples[subset] = prepare_examples(fg, bg, num_samples=args.num_examples)
+    examples["all"] = prepare_examples(args.fg, args.bg, num_samples=args.num_examples)
+    # for subset in subsets:
+    #     fg = os.path.join(args.fg, subset)
+    #     bg = os.path.join(args.bg, subset)
+    #     examples[subset] = prepare_examples(args.fg, args.bg, num_samples=args.num_examples)
 
     # prepare prompts
     quick_prompts = prepare_prompts()
 
-    block = gr.Blocks().queue()
-    with block:
+    with gr.Blocks() as demo:
+        demo.queue()
         with gr.Row():
             gr.Markdown(
                 "## IC-Light (Relighting with Foreground and Background Condition)"
@@ -137,10 +142,14 @@ if __name__ == "__main__":
             with gr.Column():
                 with gr.Row():
                     input_fg = gr.Image(
-                        source="upload", type="numpy", label="Foreground", height=480
+                        sources="upload",
+                        type="numpy",
+                        label="Foreground",
+                        height=480,
+                        image_mode="RGBA",
                     )
                     input_bg = gr.Image(
-                        source="upload", type="numpy", label="Background", height=480
+                        sources="upload", type="numpy", label="Background", height=480
                     )
                 prompt = gr.Textbox(label="Prompt")
                 bg_source = gr.Radio(
@@ -253,4 +262,4 @@ if __name__ == "__main__":
             queue=False,
         )
 
-    block.launch(server_name="0.0.0.0")
+    demo.launch(server_name="0.0.0.0")

@@ -16,10 +16,7 @@ from diffusers.models.attention_processor import AttnProcessor2_0
 from huggingface_hub import hf_hub_download
 from safetensors.torch import load_file
 from transformers import CLIPTextModel, CLIPTokenizer
-from utils import (
-    collect_images_from_dir,
-    pad_to_divisible,
-)
+from utils import collect_images_from_dir, pad_to_divisible, remove_pad_from_divisible
 
 IMAGE_TYPE = Union[str, np.ndarray, Image.Image]
 IMAGES_TYPE = Union[list[str], list[np.ndarray], list[Image.Image]]
@@ -80,11 +77,21 @@ class ICLightInferencer:
     def device(self):
         return self._device
 
+    @property
+    def vae_hw_scale_factor(self) -> int:
+        return 2 ** (len(self.vae.config.block_out_channels) - 1)
+
     def _prepare_model(self, model_name: str, checkpoint: str):
-        self.tokenizer: CLIPTokenizer = CLIPTokenizer.from_pretrained(model_name)
-        text_encoder: CLIPTextModel = CLIPTextModel.from_pretrained(model_name)
-        vae: AutoencoderKL = AutoencoderKL.from_pretrained(model_name)
-        unet: UNet2DConditionModel = UNet2DConditionModel.from_pretrained(model_name)
+        self.tokenizer: CLIPTokenizer = CLIPTokenizer.from_pretrained(
+            model_name, subfolder="tokenizer"
+        )
+        text_encoder: CLIPTextModel = CLIPTextModel.from_pretrained(
+            model_name, subfolder="text_encoder"
+        )
+        vae: AutoencoderKL = AutoencoderKL.from_pretrained(model_name, subfolder="vae")
+        unet: UNet2DConditionModel = UNet2DConditionModel.from_pretrained(
+            model_name, subfolder="unet"
+        )
 
         # modify the network
         unet = _update_unet(unet)
@@ -147,7 +154,7 @@ class ICLightInferencer:
         )
 
     @torch.inference_mode()
-    def pytorch2numpy(self, imgs: torch.Tensor, quant: bool = True):
+    def pytorch2numpy(self, imgs: torch.Tensor, quant: bool = True) -> list[np.ndarray]:
         results = []
         for x in imgs:
             y = x.movedim(0, -1)
@@ -163,7 +170,7 @@ class ICLightInferencer:
         return results
 
     @torch.inference_mode()
-    def numpy2pytorch(self, imgs: np.ndarray):
+    def numpy2pytorch(self, imgs: np.ndarray) -> torch.Tensor:
         h = (
             torch.from_numpy(np.stack(imgs, axis=0)).float() / 127.0 - 1.0
         )  # so that 127 must be strictly 0.0
@@ -247,24 +254,37 @@ class ICLightInferencer:
                 return Image.fromarray(data)
             return data
 
-        divisor: int = 2 ** (len(self.vae.config.block_out_channels) - 1)
+        divisor: int = self.vae_hw_scale_factor
         for fg, bg in fg_bg_pairs:
             fg = _load_image(fg)
             bg = _load_image(bg)
             assert fg.size == bg.size, "Support the same image size only."
+            assert fg.mode == "RGBA", "Support fg in RGBA format only."
 
+            # fill (127, 127, 127) where alpha == 0
+            # according to the `run_rmbg` function of IC-Light, the pixels start from 127.
+            new_fg = Image.new("RGB", fg.size, (127, 127, 127))
+            new_fg.paste(fg, mask=fg)
+            fg.close()
+            fg = new_fg
+
+            origin_size = fg.size
             fg = pad_to_divisible(fg, divisor=divisor)
             bg = pad_to_divisible(bg, divisor=divisor)
 
             fg = np.array(fg)
             bg = np.array(bg)
-            yield fg, bg
+            yield fg, bg, origin_size
+
+    def _postprocess(self, result: np.ndarray, origin_size: tuple[int, int]):
+        result = remove_pad_from_divisible(result, *origin_size)
+        return result
 
     @torch.inference_mode()
     def _forward(
         self,
-        fg: np.ndarray,
-        bg: np.ndarray,
+        input_fg: np.ndarray,
+        input_bg: np.ndarray,
         positive_prompt: str,
         negative_prompt: str,
         generator: torch.Generator,
@@ -273,10 +293,15 @@ class ICLightInferencer:
         highres_scale: float,
         highres_denoise: float,
     ):
-        image_height, image_width = bg.shape[:2]
-
         # fg bg embeddings
-        concat_conds = self.numpy2pytorch([fg, bg]).to(
+        # due to fg and bg sizes are already divisible by vae_hw_scale_factor
+        # rescaling with the number which is also divisible by vae_hw_scale_factor will be also divisible by vae_hw_scale_factor
+        # fg = rescale(input_fg, 512, 512)
+        # bg = rescale(input_bg, 512, 512)
+        # rescaled_size = bg.shape[:2][::-1]
+        # fg = pad_to_divisible(input_fg, divisor=self.vae_hw_scale_factor)
+        # bg = pad_to_divisible(input_bg, divisor=self.vae_hw_scale_factor)
+        concat_conds = self.numpy2pytorch([input_fg, input_bg]).to(
             device=self.vae.device, dtype=self.vae.dtype
         )
         concat_conds = (
@@ -291,6 +316,7 @@ class ICLightInferencer:
             negative_prompt=negative_prompt,
         )
 
+        image_height, image_width = input_bg.shape[:2]
         latents = (
             self.t2i_pipe(
                 prompt_embeds=conds,
@@ -301,21 +327,23 @@ class ICLightInferencer:
                 generator=generator,
                 output_type="latent",
                 guidance_scale=guidance_scale,
-                cross_attention_kwargs={"concat_conds": concat_conds.clone()},
+                cross_attention_kwargs={"concat_conds": concat_conds},
             ).images.to(self.vae.dtype)
             / self.vae.config.scaling_factor
         )
 
-        # pixels = self.vae.decode(latents).sample
-        # pixels = self.pytorch2numpy(pixels)
-        # pixels = [
-        #     resize_without_crop(
-        #         image=p,
-        #         target_width=int(round(image_width * highres_scale / 64.0) * 64),
-        #         target_height=int(round(image_height * highres_scale / 64.0) * 64),
-        #     )
-        #     for p in pixels
-        # ]
+        pixels = self.vae.decode(latents).sample
+        pixels = self.pytorch2numpy(pixels)
+
+        # remove padding
+        # image_height, image_width = input_bg.shape[:2]
+        # pixels = [resize_and_center_crop(p, image_width, image_height) for p in pixels]
+        # print(pixels[0].shape)
+
+        # resize to original size
+        # image_height, image_width = input_bg.shape[:2]
+        # pixels = [resize(p, image_width, image_height) for p in pixels]
+        # print(pixels[0].shape)
 
         # pixels = self.numpy2pytorch(pixels).to(
         #     device=self.vae.device, dtype=self.vae.dtype
@@ -325,9 +353,14 @@ class ICLightInferencer:
         # )
         # latents = latents.to(device=self.unet.device, dtype=self.unet.dtype)
 
-        # image_height, image_width = latents.shape[2] * 8, latents.shape[3] * 8
-
-        # concat_conds = self.numpy2pytorch([fg, bg]).to(
+        # # fg bg embeddings (highres)
+        # # image_height, image_width = (
+        # #     latents.shape[2] * self.vae_hw_scale_factor,
+        # #     latents.shape[3] * self.vae_hw_scale_factor,
+        # # )
+        # # fg = resize_without_crop(input_fg, image_width, image_height)
+        # # bg = resize_without_crop(input_bg, image_width, image_height)
+        # concat_conds = self.numpy2pytorch([input_fg, input_bg]).to(
         #     device=self.vae.device, dtype=self.vae.dtype
         # )
         # concat_conds = (
@@ -345,17 +378,16 @@ class ICLightInferencer:
         #         width=image_width,
         #         height=image_height,
         #         num_inference_steps=int(round(num_inference_steps / highres_denoise)),
-        #         num_images_per_prompt=num_samples,
-        #         generator=self.generator,
+        #         generator=generator,
         #         output_type="latent",
         #         guidance_scale=guidance_scale,
-        #         cross_attention_kwargs={"concat_conds": concat_conds.clone()},
+        #         cross_attention_kwargs={"concat_conds": concat_conds},
         #     ).images.to(self.vae.dtype)
         #     / self.vae.config.scaling_factor
         # )
 
-        pixels = self.vae.decode(latents).sample
-        pixels = self.pytorch2numpy(pixels)
+        # pixels = self.vae.decode(latents).sample
+        # pixels = self.pytorch2numpy(pixels)
         return pixels[0]
 
     def __call__(
@@ -376,8 +408,9 @@ class ICLightInferencer:
 
         iterator = self._preprocess(fg_bg_pairs)
         results = []
-        for fg, bg in iterator:
+        for fg, bg, origin_size in iterator:
             generator = torch.Generator(device=self.device).manual_seed(seed)
+            print(fg.shape, bg.shape, origin_size)
             result = self._forward(
                 fg,
                 bg,
@@ -389,5 +422,7 @@ class ICLightInferencer:
                 highres_scale,
                 highres_denoise,
             )
+            result = self._postprocess(result, origin_size)
+            print(result.shape)
             results.append((result, [fg, bg]))
         return results
