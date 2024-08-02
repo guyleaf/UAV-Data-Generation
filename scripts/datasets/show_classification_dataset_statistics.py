@@ -60,28 +60,34 @@ def show_classification_statistics(
         subsets = [
             subset for subset in os.listdir(root_dir) if subset not in excluded_subsets
         ]
+        subsets = sorted(subsets)
+
+    labels = {"all"}
+    for subset in subsets:
+        subset_dir = os.path.join(root_dir, subset)
+        labels.update(os.listdir(subset_dir))
+    labels = sorted(labels)
 
     max_count = 0
     subset_counts: dict[str, dict[str, int]] = defaultdict(dict)
     for subset in subsets:
         subset_dir = os.path.join(root_dir, subset)
 
-        labels = os.listdir(subset_dir)
         for label in labels:
             label_dir = os.path.join(subset_dir, label)
-            if not os.path.isdir(label_dir):
-                continue
-            count = len(os.listdir(label_dir))
-            subset_counts[subset][label] = count
+            if os.path.isdir(label_dir):
+                subset_counts[subset][label] = len(os.listdir(label_dir))
+            else:
+                subset_counts[subset][label] = 0
+
         count = sum(subset_counts[subset].values())
         subset_counts[subset]["all"] = count
         max_count = max(max_count, count)
 
     if title is None:
         title = root_dir.split(os.sep)[-1]
-    labels = list(list(subset_counts.values())[0].keys())
     x = np.arange(len(labels))
-    width = 0.25  # the width of the bars
+    width = 0.2  # the width of the bars
 
     fig, axe = plt.subplots()
     for multiplier, (subset, counts) in enumerate(subset_counts.items()):
@@ -91,7 +97,7 @@ def show_classification_statistics(
 
     axe.set_title(title)
     axe.set_ylabel("Counts")
-    axe.xaxis.set_ticks(x + width, labels)
+    axe.xaxis.set_ticks(x + (width * len(subsets)) / 2, labels)
     if not all_in_one:
         axe.legend(loc="upper left", ncols=3)
     axe.set_ylim(0, max_count + 5000)
