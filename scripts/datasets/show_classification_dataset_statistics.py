@@ -5,6 +5,8 @@ from typing import Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
+import PIL.Image as Image
+from utils import collect_images
 
 """expected structure of root folder
 root
@@ -69,6 +71,7 @@ def show_classification_statistics(
     labels = sorted(labels)
 
     max_count = 0
+    max_image_size = (0, 0)
     subset_counts: dict[str, dict[str, int]] = defaultdict(dict)
     for subset in subsets:
         subset_dir = os.path.join(root_dir, subset)
@@ -76,9 +79,22 @@ def show_classification_statistics(
         for label in labels:
             label_dir = os.path.join(subset_dir, label)
             if os.path.isdir(label_dir):
-                subset_counts[subset][label] = len(os.listdir(label_dir))
+                images = collect_images(label_dir)
+
+                # find max image size
+                for image in images:
+                    max_area = max_image_size[0] * max_image_size[1]
+                    with Image.open(image) as im:
+                        area = im.size[0] * im.size[1]
+                    if area > max_area:
+                        print(image)
+                        max_image_size = im.size
+
+                count = len(images)
             else:
-                subset_counts[subset][label] = 0
+                count = 0
+
+            subset_counts[subset][label] = count
 
         count = sum(subset_counts[subset].values())
         subset_counts[subset]["all"] = count
@@ -102,6 +118,9 @@ def show_classification_statistics(
         axe.legend(loc="upper left", ncols=3)
     axe.set_ylim(0, max_count + 5000)
     fig.savefig(f"{title}.png")
+
+    print("Maximum image size:", max_image_size)
+    print("Maximum image area:", max_image_size[0] * max_image_size[1])
 
 
 if __name__ == "__main__":

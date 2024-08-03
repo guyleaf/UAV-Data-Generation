@@ -1,4 +1,6 @@
-from typing import Optional
+from mimetypes import MimeTypes
+from pathlib import Path
+from typing import Optional, Union
 
 from sklearn.model_selection import train_test_split
 
@@ -32,3 +34,18 @@ def split_into_train_val(
         train = []
 
     return {"train": train, "val": val}
+
+
+def collect_images(root_path: Union[str, Path]) -> list[Path]:
+    mime_checker = MimeTypes()
+
+    def validate_file_type(path: Path):
+        mime_type = mime_checker.guess_type(path)[0]
+        return mime_type is not None and "image" in mime_type
+
+    return sorted(
+        filter(
+            validate_file_type,
+            Path(root_path).rglob("*.*"),
+        )
+    )
