@@ -86,9 +86,9 @@ def show_classification_statistics(
                     max_area = max_image_size[0] * max_image_size[1]
                     with Image.open(image) as im:
                         area = im.size[0] * im.size[1]
-                    if area > max_area:
-                        print(image)
-                        max_image_size = im.size
+                        if area > max_area:
+                            print(image)
+                            max_image_size = im.size
 
                 count = len(images)
             else:
