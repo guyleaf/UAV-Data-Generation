@@ -71,6 +71,7 @@ def prepare_fwid_dataset(
 
     labels = [WEATHER_MAP[label] for label in labels]
 
+    subsets: dict[str, list[str]]
     if all_in_one:
         subsets = {"": list(image_files.keys())}
     else:
@@ -102,7 +103,9 @@ def prepare_fwid_dataset(
             # save it to png format (rewrite the image to avoid 'libpng warning: sBIT: invalid' or 'Warning: unknown JFIF revision number 32.23')
             with Image.open(image) as img:
                 if img.format == "JPEG" and img.info.get("jfif_version") != (32, 23):
-                    shutil.copy2(image, target_dir)
+                    shutil.copy2(
+                        image, os.path.join(target_dir, f"{image_name_without_ext}.jpg")
+                    )
                 else:
                     img.save(
                         os.path.join(target_dir, f"{image_name_without_ext}.png"),
