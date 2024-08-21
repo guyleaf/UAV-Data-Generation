@@ -2,6 +2,7 @@ name: uav_data_generation
 channels:
   - pytorch
   - nvidia
+  - anaconda
   - defaults
 dependencies:
   - python=3.10
