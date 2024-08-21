@@ -34,7 +34,7 @@ class COCOWriter:
         self.image_counter = 1
         self.annotation_counter = 1
 
-    @classmethod
+    @staticmethod
     def get_image_format(
         id: int,
         file_name: str,
@@ -45,7 +45,7 @@ class COCOWriter:
         image = dict(id=id, file_name=file_name, width=w, height=h, license=license)
         return image
 
-    @classmethod
+    @staticmethod
     def get_annotation_format(
         id: int,
         image_id: int,
@@ -68,6 +68,8 @@ class COCOWriter:
         return annotation
 
     def add_category(self, name: str, supercategory: str) -> int:
+        assert isinstance(name, str) and isinstance(supercategory, str)
+
         id = self.category_counter
         category = dict(id=id, name=name, supercategory=supercategory)
         self.categories.append(category)
@@ -80,6 +82,7 @@ class COCOWriter:
         width: int,
         height: int,
     ) -> int:
+        assert isinstance(file_name, str) and len(file_name) > 0
         assert width > 0 and height > 0, f"Invalid size, ({width}, {height})"
 
         id = self.image_counter
@@ -99,8 +102,15 @@ class COCOWriter:
             category["id"] == category_id for category in self.categories
         ), f"Unknown category {category_id}"
 
+        image = self.images[image_id - 1]
+        width = image["width"]
+        height = image["height"]
+
         ids = []
         for bbox in bboxes:
+            x, y, w, h = bbox
+            assert width > x + w > x >= 0 and height > y + h > y >= 0
+
             id = self.annotation_counter
             annotation = self.get_annotation_format(id, image_id, category_id, *bbox)
             ids.append(id)
