@@ -9,6 +9,7 @@ from mimetypes import MimeTypes
 from pathlib import Path
 from typing import Literal, Union, get_args
 
+import PIL.Image as Image
 from rich import print
 from rich.progress import track
 from rich.prompt import Confirm
@@ -55,6 +56,13 @@ def parse_args():
         default=["clear", "cloudy"],
         help="fill the missing samples with samples from labels",
     )
+    parser.add_argument(
+        "--max-resolution",
+        type=int,
+        nargs=2,
+        default=(1920, 1920),
+        help="maximum resolution of background images",
+    )
 
     parser.add_argument(
         "--seed", type=int, default=777, help="seed for random sampling"
@@ -77,6 +85,11 @@ def parse_args():
         assert len(args.dataset_names) == len(
             args.root_dirs
         ), "The number of root dirs and dataset names should be the same."
+
+    assert (
+        args.max_resolution[0] > 0 and args.max_resolution[1] > 0
+    ), "The maximum resolution should be larger than 0."
+    args.max_resolution = tuple(args.max_resolution)
 
     return args
 
@@ -101,6 +114,7 @@ def prepare_backgrounds(
     out_dir: Path,
     max_samples: Union[int, SAMPLE_TYPES] = "avg",
     filling_labels: list[str] = ["clear", "cloudy"],
+    max_resolution: tuple[int, int] = (1920, 1920),
     seed: int = 777,
     dry_run: bool = False,
 ) -> None:
@@ -166,20 +180,34 @@ def prepare_backgrounds(
     # construct backgrounds
     if not dry_run:
         for label, images in label_to_selected_images.items():
-            for name, image in track(images, description=f"Copying {label} images..."):
+            for name, image in track(
+                images, description=f"Processing {label} images..."
+            ):
                 label_dir = backgrounds_dir / name / label
                 label_dir.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(image, label_dir / image.name)
+
+                data = Image.open(image)
+                data.thumbnail(max_resolution, resample=Image.LANCZOS)
+
+                image = image.with_suffix(".png")
+                data.save(label_dir / image.name)
+                # shutil.copy2(image, label_dir / image.name)
 
             fake_images = label_to_fake_images.get(label, [])
             for i, (name, image) in track(
                 enumerate(fake_images),
-                description=f"Copying {label} fake style images...",
+                description=f"Processing {label} fake style images...",
             ):
                 label_dir = backgrounds_dir / f"{name}_fake_style" / label
                 label_dir.mkdir(parents=True, exist_ok=True)
+
+                data = Image.open(image)
+                data.thumbnail(max_resolution, resample=Image.LANCZOS)
+
                 # avoid duplicated filenames across clear and cloudy
-                shutil.copy2(image, label_dir / f"{i}_{image.name}")
+                image = image.with_suffix(".png")
+                data.save(label_dir / f"{i}_{image.name}")
+                # shutil.copy2(image, label_dir / f"{i}_{image.name}")
 
     print("\n[bold green]Real[/bold green] images:")
     label_to_counter = {
@@ -213,6 +241,7 @@ if __name__ == "__main__":
         out_dir,
         max_samples=args.max_samples,
         filling_labels=args.filling_labels,
+        max_resolution=args.max_resolution,
         seed=args.seed,
         dry_run=args.dry_run,
     )
