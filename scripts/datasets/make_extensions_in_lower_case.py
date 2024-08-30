@@ -29,7 +29,8 @@ if __name__ == "__main__":
     for path in rich.progress.track(root_folder.rglob("*.*")):
         suffix = path.suffix.lower()
         if suffix != path.suffix:
-            path.rename(path.with_suffix(suffix))
+            if not args.dry_run:
+                path.rename(path.with_suffix(suffix))
             renaming_counter += 1
 
     print(f"Renamed {renaming_counter} files in {root_folder}.")
