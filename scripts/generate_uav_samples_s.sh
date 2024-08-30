@@ -7,5 +7,5 @@ blenderproc run -- blender/main.py \
 ~/data/Weather/Weather_Anti_UAV_S/backgrounds \
 --out-dir ~/data/Weather/Weather_Anti_UAV_S \
 --devices 0 \
---x-range -30 30 --y-range -30 30 --scale-range 0.01 0.4 --max-iof 0.2 --max-samples 6 \
+--x-range -30 30 --y-range -30 30 --scale-range 0.005 0.4 --max-iof 0.2 --max-samples 6 \
 --render-max-samples 1024 --render-resolution 1920 1920 --render-tile-size 1920
