@@ -61,7 +61,7 @@ def parse_args():
         type=int,
         nargs=2,
         default=(1920, 1920),
-        help="maximum resolution of background images",
+        help="maximum resolution of background images, (width, height)",
     )
 
     parser.add_argument(
@@ -187,11 +187,16 @@ def prepare_backgrounds(
                 label_dir.mkdir(parents=True, exist_ok=True)
 
                 data = Image.open(image)
-                data.thumbnail(max_resolution, resample=Image.LANCZOS)
-
-                image = image.with_suffix(".png")
-                data.save(label_dir / image.name)
-                # shutil.copy2(image, label_dir / image.name)
+                if data.size[0] > max_resolution[0] or data.size[1] > max_resolution[1]:
+                    data.thumbnail(max_resolution, resample=Image.LANCZOS)
+                    image = image.with_suffix(".png")
+                    data.save(
+                        label_dir / image.name,
+                        icc_profile=data.info.get("icc_profile"),
+                        exif=data.info.get("exif"),
+                    )
+                else:
+                    shutil.copy2(image, label_dir / image.name)
 
             fake_images = label_to_fake_images.get(label, [])
             for i, (name, image) in track(
@@ -202,12 +207,18 @@ def prepare_backgrounds(
                 label_dir.mkdir(parents=True, exist_ok=True)
 
                 data = Image.open(image)
-                data.thumbnail(max_resolution, resample=Image.LANCZOS)
-
-                # avoid duplicated filenames across clear and cloudy
-                image = image.with_suffix(".png")
-                data.save(label_dir / f"{i}_{image.name}")
-                # shutil.copy2(image, label_dir / f"{i}_{image.name}")
+                if data.size[0] > max_resolution[0] or data.size[1] > max_resolution[1]:
+                    data.thumbnail(max_resolution, resample=Image.LANCZOS)
+                    image = image.with_suffix(".png")
+                    # avoid duplicated filenames across clear and cloudy
+                    data.save(
+                        label_dir / f"{i}_{image.name}",
+                        icc_profile=data.info.get("icc_profile"),
+                        exif=data.info.get("exif"),
+                    )
+                else:
+                    # avoid duplicated filenames across clear and cloudy
+                    shutil.copy2(image, label_dir / f"{i}_{image.name}")
 
     print("\n[bold green]Real[/bold green] images:")
     label_to_counter = {
