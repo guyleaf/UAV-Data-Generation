@@ -1,9 +1,9 @@
 import glob
 import os
 import random
-from collections import defaultdict
 from math import radians
 from mimetypes import MimeTypes
+from operator import methodcaller
 from typing import Union
 
 import blenderproc as bproc
@@ -77,12 +77,15 @@ def setup(
     uav_objs: list[MeshObject] = bproc.filter.by_cp(
         objs, "UAV_model", True, filtered_data_type=MeshObject
     )
+    uav_objs.sort(key=methodcaller("get_name"))
 
     # organize components for each uav model as dict
-    uav_models: dict[str, list[MeshObject]] = defaultdict(list)
+    uav_models: dict[str, list[MeshObject]] = {}
     for obj in uav_objs:
         uav_name = obj.get_name()
-        uav_models[uav_name] += [obj] + obj.get_children(return_all_offspring=True)
+        uav_models[uav_name] = [obj] + sorted(
+            obj.get_children(return_all_offspring=True), key=methodcaller("get_name")
+        )
 
     assert len(uav_models) > 0, "UAV model is not found."
     print("\nFind", len(uav_models), "UAV models")
@@ -101,6 +104,7 @@ def collect_materials_by_cp(
     materials = bproc.filter.by_cp(
         materials, cp_name, cp_value, filtered_data_type=bproc.types.Material
     )
+    materials.sort(key=methodcaller("get_name"))
     print(f"Find {len(materials)} materials")
     return materials
 
