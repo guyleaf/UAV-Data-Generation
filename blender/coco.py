@@ -109,7 +109,7 @@ class COCOWriter:
         ids = []
         for bbox in bboxes:
             x, y, w, h = bbox
-            assert width > x + w > x >= 0 and height > y + h > y >= 0
+            assert width >= x + w > x >= 0 and height >= y + h > y >= 0
 
             id = self.annotation_counter
             annotation = self.get_annotation_format(id, image_id, category_id, *bbox)
