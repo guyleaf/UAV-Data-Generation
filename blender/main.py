@@ -501,7 +501,7 @@ def main(
             assert image_index + 1 == len(coco_writer.images)
             checkpoint = Checkpoint(image_index, image_paths, coco_writer)
             checkpoint.save_pickle(
-                os.path.join(checkpoints_dir, f"blender_state_{i}.pkl")
+                os.path.join(checkpoints_dir, f"blender_state_{image_index + 1}.pkl")
             )
 
             # remove oldest checkpoints
@@ -539,7 +539,7 @@ if __name__ == "__main__":
 
         ckpt = Checkpoint.from_pickle(ckpt_path)
         ckpt.restore_random_states()
-        print("Resume from the last random state.")
+        print(f"Resume from the last checkpoint, {ckpt_path}.")
     else:
         os.environ["BLENDER_PROC_RANDOM_SEED"] = str(seed)
 
