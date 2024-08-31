@@ -16,6 +16,7 @@ from mathutils import Euler, Vector
 
 sys.path.append(os.path.dirname(__file__))
 
+from checkpoint import Checkpoint
 from coco import COCOWriter
 from randomization import (
     align_camera_pose,
@@ -156,6 +157,30 @@ def parse_args():
         default=2024,
         type=int,
         help="The seed for random sampling.",
+    )
+    parser.add_argument(
+        "--resume",
+        default=False,
+        action=argparse.BooleanOptionalAction,
+        help="Resume generation with the checkpoint.",
+    )
+    parser.add_argument(
+        "--checkpoint",
+        default=None,
+        type=str,
+        help="Path to the checkpoint. If --resume is True and it is None, use the latest checkpoint in --out-dir.",
+    )
+    parser.add_argument(
+        "--max-checkpoints",
+        default=3,
+        type=int,
+        help="The maximum checkpoints to keep.",
+    )
+    parser.add_argument(
+        "--checkpoint-interval",
+        default=5,
+        type=int,
+        help="The interval for saving a checkpoint.",
     )
     parser.add_argument(
         "--device-type",
@@ -331,8 +356,10 @@ def main(
     out_dir: str = "outputs",
     device_type: str = "OPTIX",
     devices: list[int] = [0],
+    checkpoint: Optional[Checkpoint] = None,
+    max_checkpoints: int = 3,
+    checkpoint_interval: int = 5,
 ):
-    image_paths = collect_images(images_path)
     objs, uav_models = setup(
         scene_path,
         background_path,
@@ -355,13 +382,34 @@ def main(
     bpy.context.view_layer.update()
 
     # prepare COCO writer
-    coco_writer = COCOWriter()
-    category_id = coco_writer.add_category("drone", "UAV")
+    if checkpoint is not None:
+        coco_writer = checkpoint.coco_writer
+        category_id = coco_writer.find_category("drone", "UAV")
+    else:
+        coco_writer = COCOWriter()
+        category_id = coco_writer.add_category("drone", "UAV")
 
-    images_dir = os.path.join(out_dir, "foregrounds")
+    checkpoints_dir = os.path.join(out_dir, "checkpoints")
+    fg_images_dir = os.path.join(out_dir, "foregrounds")
     annotations_dir = os.path.join(out_dir, "annotations")
+
+    # collect image informations
+    image_paths = collect_images(images_path)
+    if checkpoint is not None:
+        assert (
+            checkpoint.image_paths == image_paths
+        ), "Inconsistent images. The checkpoint may be not for this."
+        for image in coco_writer.images:
+            image_path = os.path.join(fg_images_dir, image["file_name"])
+            assert os.path.exists(
+                image_path
+            ), f"The foreground image {image_path} is not Found."
+
     uav_models = list(uav_models.values())
-    for image_path in image_paths:
+    start_index = checkpoint.image_index + 1 if checkpoint is not None else 0
+    for image_index in range(start_index, len(image_paths)):
+        image_path = image_paths[image_index]
+
         # determine how many samples should be generated
         num_samples = random.randint(1, max_samples)
         selected_models = random.choices(uav_models, k=num_samples)
@@ -422,6 +470,7 @@ def main(
 
         print(f"Success: {len(uav_bboxes)} of {num_samples}.")
 
+        ## Post-processing
         # paste UAVs starting from the most distant UAV
         # sort by uav_size
         indices = list(range(len(uav_bboxes)))
@@ -440,11 +489,27 @@ def main(
         coco_writer.add_annotations(image_id, category_id, uav_bboxes)
 
         # save the foreground image
-        out_file = os.path.join(images_dir, out_file)
+        out_file = os.path.join(fg_images_dir, out_file)
         os.makedirs(os.path.dirname(out_file), exist_ok=True)
         foreground_image.save(out_file)
 
         print(f"Saved the foreground image as {out_file}")
+
+        # save the checkpoint every checkpoint_interval
+        if (image_index + 1) % checkpoint_interval == 0:
+            # ensure the COCO writer is consistent.
+            assert image_index + 1 == len(coco_writer.images)
+            checkpoint = Checkpoint(image_index, image_paths, coco_writer)
+            checkpoint.save_pickle(
+                os.path.join(checkpoints_dir, f"blender_state_{i}.pkl")
+            )
+
+            # remove oldest checkpoints
+            checkpoint_files = sorted(os.listdir(checkpoints_dir))
+            for checkpoint_file in checkpoint_files[:-max_checkpoints]:
+                os.remove(os.path.join(checkpoints_dir, checkpoint_file))
+
+    assert len(image_paths) == len(coco_writer.images)
 
     # save annotations in COCO format
     os.makedirs(annotations_dir, exist_ok=True)
@@ -453,12 +518,36 @@ def main(
 
 
 if __name__ == "__main__":
+    # checkpoint
+    # 1. random state
+    # 2. image paths (checking if it is consistent with argument & validating if the generated images exist)
+    # 3. current progress of generated images (index)
+    # 4. COCOWriter
+
     args = vars(parse_args())
-    os.environ["BLENDER_PROC_RANDOM_SEED"] = str(args.pop("seed"))
+
+    seed = args.pop("seed")
+    resume = args.pop("resume")
+    ckpt_path = args.pop("checkpoint")
+    ckpt = None
+    if resume:
+        if ckpt_path is None:
+            ckpt_root_path = os.path.join(args["out_dir"], "checkpoints")
+            # use the latest checkpoint
+            ckpt_path = sorted(os.listdir(ckpt_root_path))[-1]
+            ckpt_path = os.path.join(ckpt_root_path, ckpt_path)
+
+        ckpt = Checkpoint.from_pickle(ckpt_path)
+        ckpt.restore_random_states()
+        print("Resume from the last random state.")
+    else:
+        os.environ["BLENDER_PROC_RANDOM_SEED"] = str(seed)
+
     # TODO: refactor to use class
     main(
         args.pop("scene_path"),
         args.pop("background_path"),
         args.pop("images_path"),
         **args,
+        checkpoint=ckpt,
     )

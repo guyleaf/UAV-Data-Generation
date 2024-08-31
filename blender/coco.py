@@ -76,6 +76,16 @@ class COCOWriter:
         self.category_counter += 1
         return id
 
+    def find_category(self, name: str, supercategory: Optional[str] = None) -> int:
+        categories = filter(lambda cat: cat["name"] == name, self.categories)
+        if supercategory is not None:
+            categories = filter(
+                lambda cat: cat["supercategory"] == supercategory, categories
+            )
+        categories = list(categories)
+        assert len(categories) == 1
+        return categories[0]["id"]
+
     def add_image(
         self,
         file_name: str,
