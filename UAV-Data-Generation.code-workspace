@@ -17,10 +17,6 @@
 			"path": "../../data/checkpoints"
 		},
 		{
-			"name": "IC-Light",
-			"path": "../IC-Light"
-		},
-		{
 			"name": "PIH",
 			"path": "../PIH"
 		},
@@ -29,8 +25,23 @@
 			"path": "../neural-style-pt"
 		},
 		{
+			"name": "WCT2",
+			"path": "../WCT2"
+		},
+		{
+			"name": "ISSA",
+			"path": "../ISSA"
+		},
+		{
+			"name": "FastPhotoStyle",
+			"path": "../FastPhotoStyle"
+		},
+		{
 			"name": "archive",
 			"path": "../../archive"
+		},
+		{
+			"path": "../PytorchWCT"
 		}
 	]
 }
