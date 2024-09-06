@@ -50,11 +50,18 @@ def parse_args():
         help="maximum number of samples per category (weathers)",
     )
     parser.add_argument(
+        "--labels",
+        type=str,
+        nargs="*",
+        default=["clear", "cloudy", "foggy", "rainy", "snowy"],
+        help="collect background images from labels",
+    )
+    parser.add_argument(
         "--filling-labels",
         type=str,
         nargs="*",
         default=["clear", "cloudy"],
-        help="fill the missing samples with samples from labels",
+        help="fill the missing samples from labels",
     )
     parser.add_argument(
         "--max-resolution",
@@ -62,6 +69,12 @@ def parse_args():
         nargs=2,
         default=(1920, 1920),
         help="maximum resolution of background images, (width, height)",
+    )
+    parser.add_argument(
+        "--fake-only",
+        default=False,
+        action=argparse.BooleanOptionalAction,
+        help="ignore the labels (filling labels exclusive) and fill the missing samples from filling labels",
     )
 
     parser.add_argument(
@@ -113,10 +126,12 @@ def prepare_backgrounds(
     datasets: dict[str, Path],
     out_dir: Path,
     max_samples: Union[int, SAMPLE_TYPES] = "avg",
+    labels: list[str] = ["clear", "cloudy", "foggy", "rainy", "snowy"],
     filling_labels: list[str] = ["clear", "cloudy"],
     max_resolution: tuple[int, int] = (1920, 1920),
     seed: int = 777,
     dry_run: bool = False,
+    fake_only: bool = False,
 ) -> None:
     backgrounds_dir = out_dir / "backgrounds"
     if not dry_run:
@@ -135,11 +150,15 @@ def prepare_backgrounds(
 
     label_to_images = defaultdict[str, list[tuple[str, Path]]](list)
     for name, root_dir in track(datasets.items(), description="Collecting..."):
-        labels = sorted(os.listdir(root_dir))
         for label in labels:
             label_to_images[label].extend(
                 (name, image) for image in collect_images(root_dir / label)
             )
+
+    if fake_only:
+        removed_labels = set(labels) - set(filling_labels)
+        for label in removed_labels:
+            label_to_images[label] = []
 
     if max_samples == "avg":
         max_samples = sum(len(images) for images in label_to_images.values()) / len(
@@ -174,6 +193,9 @@ def prepare_backgrounds(
     ):
         num_missing = max_samples - len(images)
         if num_missing > 0:
+            if len(normal_images) < num_missing:
+                raise RuntimeError(f"Not enough samples to fill the {label} samples")
+
             label_to_fake_images[label] = normal_images[:num_missing]
             normal_images = normal_images[num_missing:]
 
@@ -251,8 +273,10 @@ if __name__ == "__main__":
         datasets,
         out_dir,
         max_samples=args.max_samples,
+        labels=args.labels,
         filling_labels=args.filling_labels,
         max_resolution=args.max_resolution,
         seed=args.seed,
         dry_run=args.dry_run,
+        fake_only=args.fake_only,
     )
