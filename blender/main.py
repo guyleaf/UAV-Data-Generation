@@ -7,6 +7,7 @@ import os
 import random
 import sys
 from math import radians, sqrt
+from operator import itemgetter
 from typing import Optional
 
 import PIL.Image as Image
@@ -505,9 +506,17 @@ def main(
             )
 
             # remove oldest checkpoints
-            checkpoint_files = sorted(os.listdir(checkpoints_dir))
-            for checkpoint_file in checkpoint_files[:-max_checkpoints]:
-                os.remove(os.path.join(checkpoints_dir, checkpoint_file))
+            checkpoint_files = [
+                os.path.join(checkpoints_dir, checkpoint_file)
+                for checkpoint_file in os.listdir(checkpoints_dir)
+            ]
+            checkpoint_files = [
+                (checkpoint_file, os.path.getmtime(checkpoint_file))
+                for checkpoint_file in checkpoint_files
+            ]
+            checkpoint_files = sorted(checkpoint_files, key=itemgetter(1))
+            for checkpoint_file, mtime in checkpoint_files[:-max_checkpoints]:
+                os.remove(checkpoint_file)
 
     assert len(image_paths) == len(coco_writer.images)
 
