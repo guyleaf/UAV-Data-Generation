@@ -29,7 +29,7 @@ def parse_args():
         "--annotations-dir",
         type=str,
         default="annotations",
-        help="annotations folder of tthe COCO dataset",
+        help="annotations folder of the COCO dataset",
     )
     parser.add_argument(
         "--show",
