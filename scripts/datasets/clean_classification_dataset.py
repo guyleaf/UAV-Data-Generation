@@ -59,7 +59,7 @@ def clean_dataset(root_dir: Path, duplicated_dir: Path, dry_run: bool = False):
     number_of_images = 0
     number_of_duplicates = 0
     for file in tqdm.tqdm(
-        glob.iglob(str(root_dir / "**/*.*"), recursive=True), desc="Target"
+        sorted(glob.iglob(str(root_dir / "**/*.*"), recursive=True)), desc="Target"
     ):
         mime_type = mime_checker.guess_type(file)[0]
         if mime_type is None or "image" not in mime_type:
@@ -92,7 +92,7 @@ def clean_datasets(
     image_hashes_to_files = defaultdict(list)
     number_of_images = 0
     for file in tqdm.tqdm(
-        glob.iglob(str(root_dir / "**/*.*"), recursive=True), desc="Target"
+        sorted(glob.iglob(str(root_dir / "**/*.*"), recursive=True)), desc="Target"
     ):
         mime_type = mime_checker.guess_type(file)[0]
         if mime_type is None or "image" not in mime_type:
@@ -108,7 +108,7 @@ def clean_datasets(
     number_of_duplicates = 0
     for root_dir in root_dirs:
         for file in tqdm.tqdm(
-            glob.iglob(str(root_dir / "**/*.*"), recursive=True), desc="Others"
+            sorted(glob.iglob(str(root_dir / "**/*.*"), recursive=True)), desc="Others"
         ):
             mime_type = mime_checker.guess_type(file)[0]
             if mime_type is None or "image" not in mime_type:
