@@ -1,4 +1,8 @@
+import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the top due to the check of blenderproc
+
+
 from uav_data_generation.blender.config import BaseConfig
+from uav_data_generation.blender.utils import load_config
 
 
 class Config(BaseConfig):
@@ -27,4 +31,6 @@ class Config(BaseConfig):
 
 
 if __name__ == "__main__":
-    Config()
+    cfg = load_config(__file__)
+    print()
+    print(cfg)

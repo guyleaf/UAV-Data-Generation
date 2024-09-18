@@ -12,6 +12,7 @@ import PIL.Image as Image
 from blenderproc.python.types.MaterialUtility import Material
 from blenderproc.python.types.MeshObjectUtility import MeshObject
 from mathutils import Euler, Vector
+from rich import print
 
 from uav_data_generation.blender import Checkpoint, COCOWriter
 from uav_data_generation.blender.randomization import (
@@ -25,6 +26,7 @@ from uav_data_generation.blender.utils import (
     collect_materials_by_cp,
     find_bbox_xyxy_by_alpha,
     get_cp,
+    load_config,
     reset_keyframes,
     setup,
 )
@@ -35,130 +37,13 @@ def parse_args():
         description="An UAV generation script powered by blender",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("scene_path", type=str, help="Path to the .blend scene file")
-    parser.add_argument(
-        "background_path",
-        type=str,
-        help="Path to the background HDRI file",
-    )
-    parser.add_argument(
-        "images_path",
-        type=str,
-        help="Path to the folder of image files",
-    )
+    parser.add_argument("config_path", type=str, help="Path to the config file")
 
-    # randomization settings
-    parser.add_argument(
-        "--x-range",
-        type=int,
-        nargs=2,
-        default=(-45, 45),
-        help="The angle range of x-axis in degree.",
-    )
-    parser.add_argument(
-        "--y-range",
-        type=int,
-        nargs=2,
-        default=(-45, 45),
-        help="The angle range of y-axis in degree.",
-    )
-    parser.add_argument(
-        "--z-range",
-        type=int,
-        nargs=2,
-        default=(0, 360),
-        help="The angle range of y-axis in degree.",
-    )
-    parser.add_argument(
-        "--max-samples",
-        default=20,
-        type=int,
-        help="The maximum number of UAVs per image.",
-    )
-    parser.add_argument(
-        "--max-iof",
-        type=float,
-        default=0.2,
-        help="The maximum IoF (check overlap / bbox1 & overlap / bbox2) among UAVs in image. (max_iof > 0 -> accept occlusion)",
-    )
-    parser.add_argument(
-        "--scale-range",
-        nargs=2,
-        type=float,
-        default=(0.2, 0.5),
-        help="The scale range relative to the size of image.",
-    )
-    parser.add_argument(
-        "--min-uav-area",
-        type=int,
-        default=1,
-        help="The minimum UAV area after scaling.",
-    )
-    parser.add_argument(
-        "--allow-upscaling",
-        default=False,
-        action=argparse.BooleanOptionalAction,
-        help="Allow upscaling if UAV is smaller than the sampled scale",
-    )
-    parser.add_argument(
-        "--adaptive-alignment",
-        default=True,
-        action=argparse.BooleanOptionalAction,
-        help="Enable adaptive alignment with the step (useful with motion blur)",
-    )
-    parser.add_argument(
-        "--alignment-z-offset",
-        type=float,
-        default=0,
-        help="Align the camera with the UAV and move backward with the offset (m) (useful with motion blur)",
-    )
-    parser.add_argument(
-        "--alignment-z-step",
-        type=float,
-        default=0.001,
-        help="Increase the alignment distance with the step (m) (--adaptive-alignment only)",
-    )
-
-    # render settings
-    parser.add_argument(
-        "--motion-blur",
-        default=True,
-        action=argparse.BooleanOptionalAction,
-        help="Enable motion blur or not",
-    )
-    parser.add_argument(
-        "--render-resolution",
-        nargs=2,
-        type=int,
-        default=(1920, 1920),
-        help="The original resolution of rendered UAV samples",
-    )
-    parser.add_argument(
-        "--render-max-samples",
-        type=int,
-        default=1024,
-        help="The maximum number of samples to render for each pixel",
-    )
-    parser.add_argument(
-        "--render-tile-size",
-        type=int,
-        default=2048,
-        help="The tile size for rendering a image (less -> slower & lower VRAM requirement, higher -> faster & higher VRAM requirement)",
-    )
-
-    # misc settings
     parser.add_argument(
         "--out-dir",
         type=str,
-        default="outputs",
-        help="Path to where the final files, will be saved",
-    )
-    parser.add_argument("--models", type=str, nargs="+", default=None)
-    parser.add_argument(
-        "--seed",
-        default=2024,
-        type=int,
-        help="The seed for random sampling.",
+        default=None,
+        help="Path to where the final files, will be saved. By default, use the value from config.",
     )
     parser.add_argument(
         "--resume",
@@ -171,18 +56,6 @@ def parse_args():
         default=None,
         type=str,
         help="Path to the checkpoint. If --resume is True and it is None, use the latest checkpoint in --out-dir.",
-    )
-    parser.add_argument(
-        "--max-checkpoints",
-        default=3,
-        type=int,
-        help="The maximum checkpoints to keep.",
-    )
-    parser.add_argument(
-        "--checkpoint-interval",
-        default=5,
-        type=int,
-        help="The interval for saving a checkpoint.",
     )
     parser.add_argument(
         "--device-type",
@@ -198,22 +71,6 @@ def parse_args():
         help="The GPU device ids for rendering. You can check the id by executing list_gpu_devices.py",
     )
 
-    args = parser.parse_args()
-    assert args.scene_path.endswith(".blend"), "The scene file should be a .blend file."
-    assert os.path.isdir(args.images_path), "The images_path should be a folder path."
-
-    for range_ in [args.x_range, args.y_range, args.z_range]:
-        assert (
-            range_[0] <= range_[1]
-        ), f"The left of range should be less than or equal to the right, {range_}."
-
-    assert (
-        0 < args.max_samples
-    ), "The maximum number of samples should be greater than 0."
-    assert (
-        0 < args.scale_range[0] <= args.scale_range[1] <= 1
-    ), "The scale range should be in (0, 1]."
-    assert 0 <= args.max_iof <= 1, "The maximum IoF should be in (0, 1)."
     return args
 
 
@@ -543,14 +400,20 @@ if __name__ == "__main__":
     # 4. COCOWriter
 
     args = vars(parse_args())
+    cfg = load_config(args.pop("config_path"))
 
-    seed = args.pop("seed")
-    resume = args.pop("resume")
-    ckpt_path = args.pop("checkpoint")
+    out_dir = args.pop("out_dir")
+    if out_dir is not None:
+        cfg.out_dir = out_dir
+
+    print()
+    print(cfg)
+
     ckpt = None
-    if resume:
+    if args.pop("resume"):
+        ckpt_path = args.pop("checkpoint")
         if ckpt_path is None:
-            ckpt_root_path = os.path.join(args["out_dir"], "checkpoints")
+            ckpt_root_path = os.path.join(cfg.out_dir, "checkpoints")
             # use the latest checkpoint
             ckpt_path = sorted(os.listdir(ckpt_root_path))[-1]
             ckpt_path = os.path.join(ckpt_root_path, ckpt_path)
@@ -559,13 +422,11 @@ if __name__ == "__main__":
         ckpt.restore_random_states()
         print(f"Resume from the last checkpoint, {ckpt_path}.")
     else:
-        os.environ["BLENDER_PROC_RANDOM_SEED"] = str(seed)
+        os.environ["BLENDER_PROC_RANDOM_SEED"] = str(cfg.seed)
 
     # TODO: refactor to use class
     generate_foregrounds(
-        args.pop("scene_path"),
-        args.pop("background_path"),
-        args.pop("images_path"),
+        **vars(cfg),
         **args,
         checkpoint=ckpt,
     )

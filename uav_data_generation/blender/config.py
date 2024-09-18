@@ -76,22 +76,32 @@ class BaseConfig(ABC):
     # The seed for random sampling.
     seed: int = 2024
 
-    # Resume generation with the checkpoint.
-    resume: bool = False
-    # Path to the checkpoint. If --resume is True and it is None, use the latest checkpoint in --out-dir.
-    checkpoint: Optional[str] = None
     # The maximum number of checkpoints can keep.
     max_checkpoints: int = 3
     # The interval for saving a checkpoint.
     checkpoint_interval: int = 5
 
-    # The GPU device type for rendering. Possible choices: [CPU, OPTIX, CUDA, METAL, HIP]
-    device_type: str = "OPTIX"
-    # The GPU device ids for rendering. You can check the id by executing list_gpu_devices.py.
-    devices: list[int] = [0]
-
     def __init__(self) -> None:
         self.validate_args()
+        self.__dict__ = {arg: getattr(self, arg) for arg in self._get_args()}
+
+    def _get_args(self):
+        attrs = filter(
+            lambda attr: not attr.startswith("_") and not callable(getattr(self, attr)),
+            dir(self),
+        )
+        return list(attrs)
+
+    def __repr__(self) -> str:
+        repr_str = f"Class name: '{self.__class__.__name__}' \n"
+        attrs = filter(
+            lambda attr: not attr.startswith("_") and not callable(getattr(self, attr)),
+            dir(self),
+        )
+        repr_str += "Settings:\n"
+        for attr in attrs:
+            repr_str += f"\t{attr}: {getattr(self, attr)}\n"
+        return repr_str
 
     def validate_args(self) -> None:
         assert self.scene_path.endswith(
