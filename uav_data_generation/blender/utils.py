@@ -1,4 +1,7 @@
+import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the top due to the check of blenderproc
+
 import glob
+import importlib
 import os
 import random
 from math import radians
@@ -6,13 +9,13 @@ from mimetypes import MimeTypes
 from operator import methodcaller
 from typing import Union
 
-import blenderproc as bproc
 import bpy
 import numpy as np
 from blenderproc.api.types import Entity, MeshObject, Struct
 from bpy_extras.object_utils import world_to_camera_view
-from frame import Frame
 from mathutils import Euler, Matrix, Vector
+
+from .frame import Frame
 
 AXIS = {
     "X": (1, 0, 0),
@@ -22,6 +25,14 @@ AXIS = {
     "-Y": (0, -1, 0),
     "-Z": (0, 0, -1),
 }
+
+
+def load_config(path: str, class_name: str = "Config"):
+    spec = importlib.utils.spec_from_file_location(class_name, path)
+    module = importlib.util.module_from_spec(spec)
+    print(module)
+    # sys.modules[module_name] = module
+    # spec.loader.exec_module(module)
 
 
 def setup(

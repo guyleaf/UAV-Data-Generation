@@ -2,7 +2,6 @@ import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the to
 import bpy  # noqa: F401 # isort:skip
 import argparse
 import os
-import sys
 from math import radians
 from typing import Optional
 
@@ -10,14 +9,12 @@ from mathutils import Euler, Vector
 from matplotlib import font_manager
 from PIL import Image, ImageDraw, ImageFont
 
-sys.path.append(os.path.dirname(__file__))
-
-from randomization import (
+from uav_data_generation.blender.randomization import (
     align_camera_pose,
     group_and_filter_material_slots_by_cp,
     randomize_drone_properties,
 )
-from utils import (
+from uav_data_generation.blender.utils import (
     collect_materials_by_cp,
     find_bbox_xyxy_by_alpha,
     get_cp,

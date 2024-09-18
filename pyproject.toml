@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling", "hatch-requirements-txt"]
+build-backend = "hatchling.build"
+
+[project]
+name = "uav_data_generation"
+authors = [{ name = "Leaf Ying", email = "leaf.ying.cs11@nycu.edu.tw" }]
+readme = "README.md"
+requires-python = ">=3.10"
+version = "0.0.1"
+dynamic = ["dependencies"]
+
+[tool.hatch.build.targets.uav_detection]
+only-include = ["uav_data_generation"]
+
+[tool.hatch.metadata.hooks.requirements_txt]
+files = ["requirements/blender_requirements.txt"]
+
+[tool.ruff]
+# Always generate Python 3.9-compatible code.
+target-version = "py310"

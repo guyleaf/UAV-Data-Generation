@@ -1,4 +1,3 @@
-import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the top due to the check of blenderproc
 import threading
 from types import TracebackType
 from typing import Optional, Type

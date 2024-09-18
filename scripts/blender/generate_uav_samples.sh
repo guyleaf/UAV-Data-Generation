@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eu
 
-blenderproc run -- blender/main.py \
+blenderproc run -- "$(dirname "$0")/generate_foregrounds.py" \
 ~/data/UAV/blender/UAVs.blend \
 ~/data/UAV/blender/assets/backgrounds/studiolights/city.exr \
 ~/data/Weather/Weather_Anti_UAV/backgrounds \

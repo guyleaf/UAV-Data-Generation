@@ -2,19 +2,15 @@ import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the to
 
 
 import bpy  # noqa: F401 # isort:skip
-import os
 import random
-import sys
 from collections import defaultdict
 
 import idprop
 from blenderproc.python.types.MaterialUtility import Material
 from blenderproc.python.types.MeshObjectUtility import MeshObject
-from utils import Frame
 
-sys.path.append(os.path.dirname(__file__))
-
-from utils import (
+from .frame import Frame
+from .utils import (
     are_all_meshes_in_camera_view,
     get_cp,
     rand_rotation_euler,

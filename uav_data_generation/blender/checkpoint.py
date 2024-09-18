@@ -3,7 +3,8 @@ import pickle
 import random
 
 import numpy as np
-from coco import COCOWriter
+
+from .coco import COCOWriter
 
 
 class Checkpoint:

@@ -1,11 +1,9 @@
 import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the top due to the check of blenderproc
 
-
 import bpy  # noqa: F401 # isort:skip
 import argparse
 import os
 import random
-import sys
 from math import radians, sqrt
 from operator import itemgetter
 from typing import Optional
@@ -15,16 +13,13 @@ from blenderproc.python.types.MaterialUtility import Material
 from blenderproc.python.types.MeshObjectUtility import MeshObject
 from mathutils import Euler, Vector
 
-sys.path.append(os.path.dirname(__file__))
-
-from checkpoint import Checkpoint
-from coco import COCOWriter
-from randomization import (
+from uav_data_generation.blender import Checkpoint, COCOWriter
+from uav_data_generation.blender.randomization import (
     align_camera_pose,
     group_and_filter_material_slots_by_cp,
     randomize_drone_properties,
 )
-from utils import (
+from uav_data_generation.blender.utils import (
     bbox_overlaps,
     collect_images,
     collect_materials_by_cp,
@@ -92,6 +87,12 @@ def parse_args():
         type=float,
         default=(0.2, 0.5),
         help="The scale range relative to the size of image.",
+    )
+    parser.add_argument(
+        "--min-uav-area",
+        type=int,
+        default=1,
+        help="The minimum UAV area after scaling.",
     )
     parser.add_argument(
         "--allow-upscaling",
@@ -277,6 +278,7 @@ def sample_uav_size(
     scale_range: tuple[float, float],
     image_size: tuple[int, int],
     uav_size: tuple[int, int],
+    min_uav_area: int = 1,
     allow_upscaling: bool = False,
 ) -> tuple[int, int]:
     image_total_size = image_size[0] * image_size[1]
@@ -287,8 +289,10 @@ def sample_uav_size(
         scale_ratio = random.uniform(*scale_range)
         scaled_image_total_size = image_total_size * scale_ratio
 
-        # if not allow upscaling, then raise exception if larger than the original size
-        if not allow_upscaling and scaled_image_total_size > uav_total_size:
+        # if not allow upscaling or smaller than min_uav_area, then skip it.
+        if (
+            scaled_image_total_size > uav_total_size and not allow_upscaling
+        ) or scaled_image_total_size < min_uav_area:
             continue
 
         # calculate scaled width, height
@@ -335,7 +339,7 @@ def sample_uav_location(
     return None
 
 
-def main(
+def generate_foregrounds(
     scene_path: str,
     background_path: str,
     images_path: str,
@@ -346,6 +350,7 @@ def main(
     max_samples: int = 20,
     max_iof: float = 0.5,
     scale_range: tuple[float, float] = (0.2, 0.8),
+    min_uav_area: int = 1,
     allow_upscaling: bool = False,
     adaptive_alignment: bool = True,
     alignment_z_offset: float = 0,
@@ -442,25 +447,29 @@ def main(
             uav_image = Image.fromarray(uav_image, "RGBA")
 
             # retry
-            for _ in range(50):
-                # determine the scaled size of UAV
-                scaled_uav_size = sample_uav_size(
-                    scale_range,
-                    image_size,
-                    uav_image.size,
-                    allow_upscaling=allow_upscaling,
-                )
+            # for _ in range(50):
+            # determine the scaled size of UAV
+            scaled_uav_size = sample_uav_size(
+                scale_range,
+                image_size,
+                uav_image.size,
+                min_uav_area=min_uav_area,
+                allow_upscaling=allow_upscaling,
+            )
 
-                # determine the location of UAV on the foreground image
-                uav_location = sample_uav_location(
-                    image_size, scaled_uav_size, uav_bboxes, max_iof=max_iof
-                )
-                if uav_location is not None:
-                    break
-            else:
-                # after trying 50 times, stop generating. (no space)
+            # determine the location of UAV on the foreground image
+            uav_location = sample_uav_location(
+                image_size, scaled_uav_size, uav_bboxes, max_iof=max_iof
+            )
+            # if uav_location is not None:
+            #     break
+            if uav_location is None:
                 print("Skipping...", end="")
                 continue
+            # else:
+            # after trying 50 times, stop generating. (no space)
+            # print("Skipping...", end="")
+            # continue
 
             # scale the UAV
             # filter comparison: https://pillow.readthedocs.io/en/stable/handbook/concepts.html#filters-comparison-table
@@ -553,7 +562,7 @@ if __name__ == "__main__":
         os.environ["BLENDER_PROC_RANDOM_SEED"] = str(seed)
 
     # TODO: refactor to use class
-    main(
+    generate_foregrounds(
         args.pop("scene_path"),
         args.pop("background_path"),
         args.pop("images_path"),

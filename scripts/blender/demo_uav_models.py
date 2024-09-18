@@ -2,16 +2,13 @@ import blenderproc as bproc  # isort:skip, this should be at the top due to the 
 
 import argparse
 import os
-import sys
 from typing import Optional
 
 import bpy
 import numpy as np
 from mathutils import Matrix, Vector
 
-sys.path.append(os.path.dirname(__file__))
-
-from utils import get_cp, reset_keyframes, setup
+from uav_data_generation.blender.utils import get_cp, reset_keyframes, setup
 
 
 def parse_args():

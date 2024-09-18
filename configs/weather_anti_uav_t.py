@@ -1,0 +1,30 @@
+from uav_data_generation.blender.config import BaseConfig
+
+
+class Config(BaseConfig):
+    @property
+    def scene_path(self):
+        return "~/data/UAV/blender/UAVs.blend"
+
+    @property
+    def background_path(self) -> str:
+        return "~/data/UAV/blender/assets/backgrounds/studiolights/city.exr"
+
+    @property
+    def images_path(self) -> str:
+        return "~/data/UAV/Weather_Anti_UAV_T_NO_RETRY_2e-3_3e-2/backgrounds"
+
+    x_range: tuple[int, int] = (-30, 30)
+    y_range: tuple[int, int] = (-30, 30)
+    scale_range: tuple[float, float] = (0.002, 0.03)
+    max_iof: float = 0.2
+    max_samples: int = 6
+
+    # faster prototyping
+    render_max_samples: int = 128
+
+    out_dir: str = "~/data/UAV/Weather_Anti_UAV_T_NO_RETRY_2e-3_3e-2"
+
+
+if __name__ == "__main__":
+    Config()
