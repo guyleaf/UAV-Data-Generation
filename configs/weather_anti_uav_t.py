@@ -1,5 +1,8 @@
+import os
+
 import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the top due to the check of blenderproc
 
+from rich import print
 
 from uav_data_generation.blender.config import AREA_RANGES, BaseConfig
 from uav_data_generation.blender.utils import load_config
@@ -8,15 +11,19 @@ from uav_data_generation.blender.utils import load_config
 class Config(BaseConfig):
     @property
     def scene_path(self):
-        return "~/data/UAV/blender/UAVs.blend"
+        return os.path.expanduser("~/data/UAV/blender/UAVs.blend")
 
     @property
     def background_path(self) -> str:
-        return "~/data/UAV/blender/assets/backgrounds/studiolights/city.exr"
+        return os.path.expanduser(
+            "~/data/UAV/blender/assets/backgrounds/studiolights/city.exr"
+        )
 
     @property
     def images_path(self) -> str:
-        return "~/data/UAV/Weather_Anti_UAV_T_NO_RETRY_2e-3_3e-2/backgrounds"
+        return os.path.expanduser(
+            "~/data/UAV/Weather_Anti_UAV_T_NO_RETRY_AREA/backgrounds"
+        )
 
     x_range: tuple[int, int] = (-30, 30)
     y_range: tuple[int, int] = (-30, 30)
@@ -32,7 +39,7 @@ class Config(BaseConfig):
     # faster prototyping
     render_max_samples: int = 128
 
-    out_dir: str = "~/data/UAV/Weather_Anti_UAV_T_NO_RETRY_2e-3_3e-2"
+    out_dir: str = "~/data/UAV/Weather_Anti_UAV_T_NO_RETRY_AREA"
 
 
 if __name__ == "__main__":

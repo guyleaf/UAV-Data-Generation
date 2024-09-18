@@ -55,7 +55,7 @@ class BaseConfig(ABC):
     area_ranges: AREA_RANGES = (
         (0**2, 32**2),
         (32**2, 96**2),
-        (96**2, 1e5**2),
+        (96**2, 100000**2),
     )
     # The scale range relative to the size of image.
     # scale_range: tuple[float, float] = (0.2, 0.5)
@@ -81,8 +81,6 @@ class BaseConfig(ABC):
     out_dir: str = "outputs"
     # Use UAV models specified by the list.
     models: Optional[list[str]] = None
-    # The seed for random sampling.
-    seed: int = 2024
 
     # The maximum number of checkpoints can keep.
     max_checkpoints: int = 3
@@ -91,7 +89,13 @@ class BaseConfig(ABC):
 
     def __init__(self) -> None:
         self.validate_args()
-        self.__dict__ = {arg: getattr(self, arg) for arg in self._get_args()}
+
+    def __repr__(self) -> str:
+        # repr_str = f"Class name: '{self.__class__.__name__}' \n"
+        repr_str = "Settings:\n"
+        for attr in self._get_args():
+            repr_str += f" {attr}: {getattr(self, attr)}\n"
+        return repr_str
 
     def _get_args(self):
         attrs = filter(
@@ -99,17 +103,6 @@ class BaseConfig(ABC):
             dir(self),
         )
         return list(attrs)
-
-    def __repr__(self) -> str:
-        repr_str = f"Class name: '{self.__class__.__name__}' \n"
-        attrs = filter(
-            lambda attr: not attr.startswith("_") and not callable(getattr(self, attr)),
-            dir(self),
-        )
-        repr_str += "Settings:\n"
-        for attr in attrs:
-            repr_str += f"\t{attr}: {getattr(self, attr)}\n"
-        return repr_str
 
     def validate_args(self) -> None:
         assert self.scene_path.endswith(
@@ -137,6 +130,9 @@ class BaseConfig(ABC):
                 x[1] <= y[0]
             ), "The start of area range should be larger or equal to previous end one."
         assert 0 <= self.max_iof <= 1, "The maximum IoF should be in (0, 1)."
+
+    def to_dict(self):
+        return {arg: getattr(self, arg) for arg in self._get_args()}
 
 
 if __name__ == "__main__":

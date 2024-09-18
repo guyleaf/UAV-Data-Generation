@@ -47,6 +47,12 @@ def parse_args():
         help="Path to where the final files, will be saved. By default, use the value from config.",
     )
     parser.add_argument(
+        "--seed",
+        default=2024,
+        type=int,
+        help="The seed for random sampling.",
+    )
+    parser.add_argument(
         "--resume",
         default=False,
         action=argparse.BooleanOptionalAction,
@@ -71,6 +77,7 @@ def parse_args():
         nargs="+",
         help="The GPU device ids for rendering. You can check the id by executing list_gpu_devices.py",
     )
+    args = parser.parse_args()
 
     return args
 
@@ -428,17 +435,19 @@ if __name__ == "__main__":
     args = vars(parse_args())
     cfg = load_config(args.pop("config_path"))
 
+    print()
+    print("Arguments:", args)
+
     out_dir = args.pop("out_dir")
     if out_dir is not None:
         cfg.out_dir = out_dir
 
-    print()
-    print(args)
     print(cfg)
 
+    seed = args.pop("seed")
+    ckpt_path = args.pop("checkpoint")
     ckpt = None
     if args.pop("resume"):
-        ckpt_path = args.pop("checkpoint")
         if ckpt_path is None:
             ckpt_root_path = os.path.join(cfg.out_dir, "checkpoints")
             # use the latest checkpoint
@@ -449,11 +458,11 @@ if __name__ == "__main__":
         ckpt.restore_random_states()
         print(f"Resume from the last checkpoint, {ckpt_path}.")
     else:
-        os.environ["BLENDER_PROC_RANDOM_SEED"] = str(cfg.seed)
+        os.environ["BLENDER_PROC_RANDOM_SEED"] = str(seed)
 
     # TODO: refactor to use class
     generate_foregrounds(
-        **vars(cfg),
+        **cfg.to_dict(),
         **args,
         checkpoint=ckpt,
     )
