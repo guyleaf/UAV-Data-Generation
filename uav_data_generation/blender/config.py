@@ -2,6 +2,8 @@ import os
 from abc import ABC, abstractmethod
 from typing import Optional
 
+AREA_RANGES = tuple[tuple[int, int], tuple[int, int], tuple[int, int]]
+
 
 class BaseConfig(ABC):
     @property
@@ -49,10 +51,16 @@ class BaseConfig(ABC):
 
     # The maximum IoF (check overlap / bbox1 & overlap / bbox2) among UAVs in image. (max_iof > 0 -> accept occlusion)
     max_iof: float = 0.2
+    # The area ranges [a, b) for small, medium, large.
+    area_ranges: AREA_RANGES = (
+        (0**2, 32**2),
+        (32**2, 96**2),
+        (96**2, 1e5**2),
+    )
     # The scale range relative to the size of image.
-    scale_range: tuple[float, float] = (0.2, 0.5)
+    # scale_range: tuple[float, float] = (0.2, 0.5)
     # The minimum UAV area after scaling.
-    min_uav_area: int = 1
+    # min_uav_area: int = 1
     # Allow upscaling if UAV is smaller than the sampled scale.
     allow_upscaling: bool = False
 
@@ -120,8 +128,14 @@ class BaseConfig(ABC):
             0 < self.max_samples
         ), "The maximum number of samples should be greater than 0."
         assert (
-            0 < self.scale_range[0] <= self.scale_range[1] <= 1
-        ), "The scale range should be in (0, 1]."
+            len(self.area_ranges) == 3
+        ), "The area ranges should contain three ranges, small, medium, and large."
+        for area_range in self.area_ranges:
+            assert area_range[0] < area_range[1], "Invalid area range format."
+        for x, y in zip(self.area_ranges[:-1], self.area_ranges[1:]):
+            assert (
+                x[1] <= y[0]
+            ), "The start of area range should be larger or equal to previous end one."
         assert 0 <= self.max_iof <= 1, "The maximum IoF should be in (0, 1)."
 
 

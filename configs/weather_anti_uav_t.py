@@ -1,7 +1,7 @@
 import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the top due to the check of blenderproc
 
 
-from uav_data_generation.blender.config import BaseConfig
+from uav_data_generation.blender.config import AREA_RANGES, BaseConfig
 from uav_data_generation.blender.utils import load_config
 
 
@@ -20,9 +20,14 @@ class Config(BaseConfig):
 
     x_range: tuple[int, int] = (-30, 30)
     y_range: tuple[int, int] = (-30, 30)
-    scale_range: tuple[float, float] = (0.002, 0.03)
+    # scale_range: tuple[float, float] = (0.002, 0.03)
     max_iof: float = 0.2
     max_samples: int = 6
+    area_ranges: AREA_RANGES = (
+        (0**2, 32**2),
+        (32**2, 96**2),
+        (96**2, 1e5**2),
+    )
 
     # faster prototyping
     render_max_samples: int = 128

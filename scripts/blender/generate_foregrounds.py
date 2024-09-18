@@ -15,6 +15,7 @@ from mathutils import Euler, Vector
 from rich import print
 
 from uav_data_generation.blender import Checkpoint, COCOWriter
+from uav_data_generation.blender.config import AREA_RANGES
 from uav_data_generation.blender.randomization import (
     align_camera_pose,
     group_and_filter_material_slots_by_cp,
@@ -132,38 +133,58 @@ def generate_uav_samples(
 
 
 def sample_uav_size(
-    scale_range: tuple[float, float],
+    area_ranges: AREA_RANGES,
     image_size: tuple[int, int],
     uav_size: tuple[int, int],
-    min_uav_area: int = 1,
+    # min_uav_area: int = 1,
     allow_upscaling: bool = False,
 ) -> tuple[int, int]:
-    image_total_size = image_size[0] * image_size[1]
-    uav_total_size = uav_size[0] * uav_size[1]
+    image_area = image_size[0] * image_size[1]
+    uav_area = uav_size[0] * uav_size[1]
 
     for _ in range(50):
-        # randomly sample a scale_ratio
-        scale_ratio = random.uniform(*scale_range)
-        scaled_image_total_size = image_total_size * scale_ratio
+        # select coco area
+        area_start, area_end = random.choice(area_ranges)
+        area_end = min(area_end, image_area)
+
+        # if image area is smaller than the selected area range, then skip it.
+        if area_start >= area_end:
+            continue
+
+        # randomly sample a area
+        area = random.randrange(area_start, area_end)
+
+        # scale_ratio = random.uniform(*area_ranges)
+        # scaled_image_total_size = image_total_size * scale_ratio
 
         # if not allow upscaling or smaller than min_uav_area, then skip it.
-        if (
-            scaled_image_total_size > uav_total_size and not allow_upscaling
-        ) or scaled_image_total_size < min_uav_area:
+        # if (
+        #     scaled_image_total_size > uav_total_size and not allow_upscaling
+        # ) or scaled_image_total_size < min_uav_area:
+        #     continue
+        if area > uav_area and not allow_upscaling:
             continue
 
         # calculate scaled width, height
         # w * r, h * r = (W, H)
-        # w * h * r^2 ~= image_total_size * scale_ratio
-        # r = sqrt(image_total_size * scale_ratio / uav_total_size)
-        uav_scale_ratio = sqrt(scaled_image_total_size / uav_total_size)
-
+        # w * h * r^2 ~= area
+        # r = sqrt(area / uav_total_size)
+        uav_scale_ratio = sqrt(area / uav_area)
         # round to the closet integer & round half to even (default rounding mode in IEEE 754)
-        return round(uav_size[0] * uav_scale_ratio), round(
-            uav_size[1] * uav_scale_ratio
+        scaled_uav_size = (
+            round(uav_size[0] * uav_scale_ratio),
+            round(uav_size[1] * uav_scale_ratio),
         )
 
-    raise RuntimeError(f"Cannot find an ideal scale fitting the range {scale_range}.")
+        # if edge size of scaled uav is still bigger than image size, then skip it.
+        if scaled_uav_size[0] > image_size[0] or scaled_uav_size[1] > image_size[1]:
+            continue
+
+        return scaled_uav_size
+
+    raise RuntimeError(
+        f"Cannot find an ideal area to fit the ranges. UAV: {uav_size}, Image: {image_size}."
+    )
 
 
 def sample_uav_location(
@@ -174,11 +195,11 @@ def sample_uav_location(
 ) -> Optional[tuple[int, int]]:
     end_w, end_h = image_size[0] - uav_size[0], image_size[1] - uav_size[1]
 
-    if end_w < 0 or end_h < 0:
-        print(
-            f"Warning! Cannot find an ideal location fitting the UAV size {uav_size}."
-        )
-        return None
+    # if end_w < 0 or end_h < 0:
+    #     print(
+    #         f"Warning! Cannot find an ideal location fitting the UAV size {uav_size}."
+    #     )
+    #     return None
 
     for _ in range(50):
         # randomly sample a position from image based on the actual size
@@ -206,8 +227,13 @@ def generate_foregrounds(
     z_range: tuple[int, int] = (0, 360),
     max_samples: int = 20,
     max_iof: float = 0.5,
-    scale_range: tuple[float, float] = (0.2, 0.8),
-    min_uav_area: int = 1,
+    area_ranges: AREA_RANGES = (
+        (0**2, 32**2),
+        (32**2, 96**2),
+        (96**2, 1e5**2),
+    ),
+    # scale_range: tuple[float, float] = (0.2, 0.8),
+    # min_uav_area: int = 1,
     allow_upscaling: bool = False,
     adaptive_alignment: bool = True,
     alignment_z_offset: float = 0,
@@ -307,10 +333,10 @@ def generate_foregrounds(
             # for _ in range(50):
             # determine the scaled size of UAV
             scaled_uav_size = sample_uav_size(
-                scale_range,
+                area_ranges,
                 image_size,
                 uav_image.size,
-                min_uav_area=min_uav_area,
+                # min_uav_area=min_uav_area,
                 allow_upscaling=allow_upscaling,
             )
 
@@ -407,6 +433,7 @@ if __name__ == "__main__":
         cfg.out_dir = out_dir
 
     print()
+    print(args)
     print(cfg)
 
     ckpt = None
