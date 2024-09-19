@@ -146,19 +146,21 @@ def sample_uav_size(
     # min_uav_area: int = 1,
     allow_upscaling: bool = False,
 ) -> tuple[int, int]:
-    image_area = image_size[0] * image_size[1]
-    uav_area = uav_size[0] * uav_size[1]
+    image_w, image_h = image_size
+    uav_w, uav_h = uav_size
+    image_area = image_w * image_h
+    uav_area = uav_w * uav_h
 
     for _ in range(50):
-        # select coco area
+        # 1. select coco area
         area_start, area_end = random.choice(area_ranges)
-        area_end = min(area_end, image_area)
+        area_end = min(area_end, image_area + 1)
 
-        # if image area is smaller than the selected area range, then skip it.
+        # if image area is smaller or equal to the selected area range, then skip it.
         if area_start >= area_end:
             continue
 
-        # randomly sample a area
+        # 2. randomly sample a area from [a, b)
         area = random.randrange(area_start, area_end)
 
         # scale_ratio = random.uniform(*area_ranges)
@@ -172,19 +174,19 @@ def sample_uav_size(
         if area > uav_area and not allow_upscaling:
             continue
 
-        # calculate scaled width, height
+        # 3. calculate scaled width, height
         # w * r, h * r = (W, H)
         # w * h * r^2 ~= area
-        # r = sqrt(area / uav_total_size)
+        # r = sqrt(area / uav_area)
         uav_scale_ratio = sqrt(area / uav_area)
         # round to the closet integer & round half to even (default rounding mode in IEEE 754)
         scaled_uav_size = (
-            round(uav_size[0] * uav_scale_ratio),
-            round(uav_size[1] * uav_scale_ratio),
+            round(uav_w * uav_scale_ratio),
+            round(uav_h * uav_scale_ratio),
         )
 
-        # if edge size of scaled uav is still bigger than image size, then skip it.
-        if scaled_uav_size[0] > image_size[0] or scaled_uav_size[1] > image_size[1]:
+        # if edge size of scaled uav is still larger than image size, then skip it.
+        if scaled_uav_size[0] > image_w or scaled_uav_size[1] > image_h:
             continue
 
         return scaled_uav_size
@@ -220,7 +222,7 @@ def sample_uav_location(
         if (iofs1 <= max_iof).all() and (iofs2 <= max_iof).all():
             return x, y
 
-    print(f"Warning! Cannot find an ideal location fitting the maximum IoF {max_iof}.")
+    print(f"Warning! Cannot find an ideal location to fit the maximum IoF {max_iof}.")
     return None
 
 

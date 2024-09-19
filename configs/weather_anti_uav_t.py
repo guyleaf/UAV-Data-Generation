@@ -31,9 +31,9 @@ class Config(BaseConfig):
     max_iof: float = 0.2
     max_samples: int = 6
     area_ranges: AREA_RANGES = (
-        (0**2, 32**2),
+        (1**2, 32**2),
         (32**2, 96**2),
-        (96**2, 1e5**2),
+        (96**2, 100000**2),
     )
 
     # faster prototyping

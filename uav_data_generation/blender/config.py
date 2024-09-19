@@ -53,7 +53,7 @@ class BaseConfig(ABC):
     max_iof: float = 0.2
     # The area ranges [a, b) for small, medium, large.
     area_ranges: AREA_RANGES = (
-        (0**2, 32**2),
+        (1**2, 32**2),
         (32**2, 96**2),
         (96**2, 100000**2),
     )
@@ -124,7 +124,7 @@ class BaseConfig(ABC):
             len(self.area_ranges) == 3
         ), "The area ranges should contain three ranges, small, medium, and large."
         for area_range in self.area_ranges:
-            assert area_range[0] < area_range[1], "Invalid area range format."
+            assert 0 < area_range[0] < area_range[1], "Invalid area range format."
         for x, y in zip(self.area_ranges[:-1], self.area_ranges[1:]):
             assert (
                 x[1] <= y[0]
