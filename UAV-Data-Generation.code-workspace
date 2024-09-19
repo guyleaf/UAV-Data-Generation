@@ -29,19 +29,8 @@
 			"path": "../WCT2"
 		},
 		{
-			"name": "ISSA",
-			"path": "../ISSA"
-		},
-		{
-			"name": "FastPhotoStyle",
-			"path": "../FastPhotoStyle"
-		},
-		{
 			"name": "archive",
 			"path": "../../archive"
-		},
-		{
-			"path": "../PytorchWCT"
 		}
 	]
 }
