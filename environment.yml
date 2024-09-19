@@ -1,4 +1,4 @@
-name: uav_data_generation
+name: uav_data_generation_test
 channels:
   - pytorch
   - nvidia
@@ -10,5 +10,4 @@ dependencies:
   - torchvision=0.19
   - pytorch-cuda=12.1
   - pip:
-      - -r "requirements/requirements.txt"
-      - -e .
+      - -e .[all]

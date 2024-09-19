@@ -1,6 +1,7 @@
+import importlib.util
 import os
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Type
 
 AREA_RANGES = tuple[tuple[int, int], tuple[int, int], tuple[int, int]]
 
@@ -103,6 +104,15 @@ class BaseConfig(ABC):
             dir(self),
         )
         return list(attrs)
+
+    @classmethod
+    def from_file(cls, path: str, class_name: str = "Config"):
+        spec = importlib.util.spec_from_file_location("cfg", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        cfg: Type[cls] = getattr(module, class_name)
+        return cfg()
 
     def validate_args(self) -> None:
         assert self.scene_path.endswith(

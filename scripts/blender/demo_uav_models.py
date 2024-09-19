@@ -8,7 +8,8 @@ import bpy
 import numpy as np
 from mathutils import Matrix, Vector
 
-from uav_data_generation.blender.utils import get_cp, reset_keyframes, setup
+from uav_data_generation.blender.setup import setup
+from uav_data_generation.blender.utils.utils import get_cp, reset_keyframes
 
 
 def parse_args():

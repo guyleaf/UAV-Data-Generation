@@ -5,7 +5,6 @@ import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the to
 from rich import print
 
 from uav_data_generation.blender.config import AREA_RANGES, BaseConfig
-from uav_data_generation.blender.utils import load_config
 
 
 class Config(BaseConfig):
@@ -43,6 +42,6 @@ class Config(BaseConfig):
 
 
 if __name__ == "__main__":
-    cfg = load_config(__file__)
+    cfg = Config.from_file(__file__)
     print()
     print(cfg)

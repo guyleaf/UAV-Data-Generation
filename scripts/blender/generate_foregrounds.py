@@ -15,22 +15,19 @@ from mathutils import Euler, Vector
 from rich import print
 
 from uav_data_generation.blender import Checkpoint, COCOWriter
-from uav_data_generation.blender.config import AREA_RANGES
-from uav_data_generation.blender.randomization import (
-    align_camera_pose,
-    group_and_filter_material_slots_by_cp,
+from uav_data_generation.blender.camera import align_camera_pose
+from uav_data_generation.blender.config import AREA_RANGES, BaseConfig
+from uav_data_generation.blender.drone import (
     randomize_drone_properties,
 )
-from uav_data_generation.blender.utils import (
+from uav_data_generation.blender.setup import setup
+from uav_data_generation.blender.utils.bbox import (
     bbox_overlaps,
-    collect_images,
-    collect_materials_by_cp,
     find_bbox_xyxy_by_alpha,
-    get_cp,
-    load_config,
-    reset_keyframes,
-    setup,
 )
+from uav_data_generation.blender.utils.material import collect_materials_by_cp
+from uav_data_generation.blender.utils.utils import get_cp, reset_keyframes
+from uav_data_generation.utils.io import collect_images
 
 
 def parse_args():
@@ -96,20 +93,14 @@ def generate_uav_samples(
     original_action_keys = bpy.data.actions.keys()
 
     for uav_components in uav_models:
-        uav_model = uav_components[0]
-
         # show components of the current uav model
         for uav_component in uav_components:
             visibility = get_cp(uav_component, "visibility", default=True)
             uav_component.hide(not visibility)
 
-        # get material slots which require material_randomization
-        material_slots_groups = group_and_filter_material_slots_by_cp(uav_components)
-
         # randomize the material and rotation
         frame = randomize_drone_properties(
-            uav_model,
-            material_slots_groups,
+            uav_components,
             materials,
             x_range=x_range,
             y_range=y_range,
@@ -435,7 +426,7 @@ if __name__ == "__main__":
     # 4. COCOWriter
 
     args = vars(parse_args())
-    cfg = load_config(args.pop("config_path"))
+    cfg = BaseConfig.from_file(args.pop("config_path"))
 
     print()
     print("Arguments:", args)

@@ -14,7 +14,13 @@ dynamic = ["dependencies"]
 only-include = ["uav_data_generation"]
 
 [tool.hatch.metadata.hooks.requirements_txt]
-files = ["requirements/blender_requirements.txt"]
+files = []
+
+[tool.hatch.metadata.hooks.requirements_txt.optional-dependencies]
+runtime = ["requirements/requirements.txt"]
+dev = ["requirements/dev_requirements.txt"]
+blender = ["requirements/blender_requirements.txt"]
+all = ["uav_data_generation[runtime,dev,blender]"]
 
 [tool.ruff]
 # Always generate Python 3.9-compatible code.

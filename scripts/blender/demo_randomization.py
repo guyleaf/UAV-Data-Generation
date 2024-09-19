@@ -9,18 +9,15 @@ from mathutils import Euler, Vector
 from matplotlib import font_manager
 from PIL import Image, ImageDraw, ImageFont
 
-from uav_data_generation.blender.randomization import (
-    align_camera_pose,
+from uav_data_generation.blender.camera import align_camera_pose
+from uav_data_generation.blender.drone import (
     group_and_filter_material_slots_by_cp,
     randomize_drone_properties,
 )
-from uav_data_generation.blender.utils import (
-    collect_materials_by_cp,
-    find_bbox_xyxy_by_alpha,
-    get_cp,
-    reset_keyframes,
-    setup,
-)
+from uav_data_generation.blender.setup import setup
+from uav_data_generation.blender.utils.bbox import find_bbox_xyxy_by_alpha
+from uav_data_generation.blender.utils.material import collect_materials_by_cp
+from uav_data_generation.blender.utils.utils import get_cp, reset_keyframes
 
 
 def parse_args():
