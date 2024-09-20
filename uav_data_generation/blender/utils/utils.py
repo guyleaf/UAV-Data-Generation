@@ -12,11 +12,21 @@ def get_cp(obj: Struct, key: str, default=None):
 
 
 def reset_keyframes(original_action_keys: list[str] = []) -> None:
-    """Removes registered keyframes from all objects which are not in original_action_keys and resets frame_start and frame_end"""
+    """
+    Removes registered keyframes from all objects which are not in original_action_keys and resets frame_start and frame_end.
+
+    Refers to `bproc.api.utility.reset_keyframes()`.
+    By default, the bproc version will remove all animations (including those in .blend file).
+
+    So, I reimplement it to exclude the original actions.
+
+    Args:
+        original_action_keys (list[str], optional): Original actions. You can get it from `bpy.data.actions.keys()`. Defaults to [].
+    """
     bpy.context.scene.frame_start = 0
     bpy.context.scene.frame_end = 0
 
-    # clear all camera poses among keyframes
+    # clear all camera poses and animations among keyframes
     tbd_action_keys = set(bpy.data.actions.keys()) - set(original_action_keys)
     for action_key in tbd_action_keys:
         action = bpy.data.actions[action_key]
