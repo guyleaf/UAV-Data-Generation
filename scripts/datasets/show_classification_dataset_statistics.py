@@ -9,7 +9,8 @@ import PIL.Image as Image
 from matplotlib.axes import Axes
 from matplotlib.ticker import PercentFormatter, ScalarFormatter
 from rich import print
-from utils import collect_images
+
+from uav_data_generation.utils.io import collect_images
 
 """expected structure of root folder
 root

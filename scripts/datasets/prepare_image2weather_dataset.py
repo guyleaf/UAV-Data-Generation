@@ -1,10 +1,13 @@
 import argparse
 import os
 import shutil
-from mimetypes import MimeTypes
+from pathlib import Path
 
-import tqdm
-from utils import split_into_train_val
+from rich import print
+from rich.progress import track
+
+from uav_data_generation.utils.dataset import split_into_train_val
+from uav_data_generation.utils.io import collect_images
 
 WEATHER_MAP = {
     "rain": "rainy",
@@ -53,23 +56,18 @@ def prepare_image2weather_dataset(
     os.makedirs(out_dir, exist_ok=True)
 
     # collect labels
-    labels = sorted(os.listdir(root_dir))
+    labels = sorted(WEATHER_MAP.keys())
 
-    mime_checker = MimeTypes()
     image_files = {}
     for label in labels:
         # collect images
         folder = os.path.join(root_dir, label)
-        for image in sorted(os.listdir(folder)):
-            mime_type = mime_checker.guess_type(image)[0]
-            if mime_type is None or "image" not in mime_type:
-                continue
-
-            image = os.path.join(folder, image)
+        for image in collect_images(folder):
             image_files[image] = WEATHER_MAP[label]
 
-    labels = [WEATHER_MAP[label] for label in labels]
+    labels = sorted(WEATHER_MAP.values())
 
+    subsets: dict[str, list[Path]]
     if all_in_one:
         subsets = {"": list(image_files.keys())}
     else:
@@ -90,7 +88,7 @@ def prepare_image2weather_dataset(
             os.makedirs(label_dir, exist_ok=True)
 
         counter = {label: 0 for label in labels}
-        for image in tqdm.tqdm(images, desc=f"{subset.capitalize()} images"):
+        for image in track(images, description=f"{subset.capitalize()} images"):
             label = image_files[image]
             shutil.copy2(image, os.path.join(subset_dir, label))
             counter[label] += 1
