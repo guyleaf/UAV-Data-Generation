@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -eu
 
-python "$(dirname "$0")/prepare_backgrounds.py" ~/data/Weather/FWID_Image2Weather/Image2Weather ~/data/Weather/FWID_Image2Weather/FWID ~/data/UAV/Weather_Anti_UAV_T_NO_RETRY_AREA --max-samples 500
+python "$(dirname "$0")/prepare_backgrounds.py" ~/data/Weather/FWID_Image2Weather/Image2Weather ~/data/Weather/FWID_Image2Weather/FWID ~/data/UAV/Weather_Anti_UAV_T_NO_RETRY_AREA/backgrounds --max-samples 500
