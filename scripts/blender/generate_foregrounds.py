@@ -225,12 +225,12 @@ def generate_foregrounds(
     x_range: tuple[int, int] = (-45, 45),
     y_range: tuple[int, int] = (-45, 45),
     z_range: tuple[int, int] = (0, 360),
-    max_samples: int = 20,
+    sample_range: tuple[int, int] = (1, 20),
     max_iof: float = 0.5,
     area_ranges: AREA_RANGES = (
-        (0**2, 32**2),
+        (1**2, 32**2),
         (32**2, 96**2),
-        (96**2, 1e5**2),
+        (96**2, 100000**2),
     ),
     # scale_range: tuple[float, float] = (0.2, 0.8),
     # min_uav_area: int = 1,
@@ -300,7 +300,7 @@ def generate_foregrounds(
         image_path = image_paths[image_index]
 
         # determine how many samples should be generated
-        num_samples = random.randint(1, max_samples)
+        num_samples = random.randint(*sample_range)
         selected_models = random.choices(uav_models, k=num_samples)
 
         # create an foreground image with the same size as the image
@@ -433,7 +433,7 @@ if __name__ == "__main__":
 
     out_dir = args.pop("out_dir")
     if out_dir is not None:
-        cfg.out_dir = out_dir
+        cfg.out_dir = os.path.expanduser(out_dir)
 
     print(cfg)
 
