@@ -5,6 +5,8 @@ import shutil
 from rich import print
 from rich.progress import track
 
+from uav_data_generation.utils.io import collect_images
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -68,18 +70,15 @@ def combine_datasets(
                 out_label_dir = os.path.join(out_subset_dir, label)
 
                 # 2024.09.14 better reproducibility
-                images = sorted(os.listdir(label_dir))
+                images = collect_images(label_dir)
                 for image in track(
                     images, description=f"{subset} - {root_dir} - {label} images"
                 ):
-                    extension = image.split(".")[1]
-                    # rename image to %5d.%ext format
-                    out_image = f"{counter}".zfill(5) + f".{extension}"
-
-                    image_path = os.path.join(label_dir, image)
+                    # rename image to %8d.%ext format
+                    out_image = image.with_stem(f"{counter}".zfill(8)).name
                     out_image_path = os.path.join(out_label_dir, out_image)
 
-                    shutil.copy2(image_path, out_image_path)
+                    shutil.copy2(image, out_image_path)
                     counter += 1
 
         print(subset.capitalize())
