@@ -3,13 +3,14 @@ import json
 import shutil
 from copy import deepcopy
 from pathlib import Path
-from typing import Optional, Union
+from typing import Union
 
 from PIL import Image
 from pycocotools.coco import COCO
 from rich import print
 from rich.progress import track
-from sklearn.model_selection import train_test_split
+
+from uav_data_generation.utils.dataset import split_into_train_val
 
 NOT_TO_COPY_KEYS = {"images", "annotations"}
 
@@ -39,6 +40,12 @@ def parse_args():
         help="root folder of the output dataset. If None, storing in the root_dir.",
     )
     parser.add_argument(
+        "--annotation-out-dir",
+        type=str,
+        default="annotations",
+        help="relative path of annotation output folder",
+    )
+    parser.add_argument(
         "--copy",
         action=argparse.BooleanOptionalAction,
         default=False,
@@ -60,19 +67,6 @@ def parse_args():
 
     return args
 
-
-def split_into_train_val(
-    x: list, val_ratio: float, seed: int, labels: Optional[list] = None
-):
-    if val_ratio < 1.0:
-        train, val = train_test_split(
-            x, test_size=val_ratio, random_state=seed, stratify=labels
-        )
-    else:
-        val = x
-        train = []
-
-    return {"train": train, "val": val}
 
 
 def update_coco_annotation(coco: COCO, images_path: Path):
@@ -142,6 +136,7 @@ def post_process(
     out_dir: Union[str, Path],
     images_dir: str = "stylized",
     annotation_file: str = "annotations/foreground.json",
+    annotation_out_dir: str = "annotations",
     copy: bool = False,
     val_ratio: float = 0.333,
     seed: int = 2024,
@@ -157,7 +152,8 @@ def post_process(
     coco = update_coco_annotation(coco, images_path)
 
     # 2. save the updated coco annotation
-    out_annotations_path = out_path / "annotations"
+    out_annotations_path = out_path / annotation_out_dir
+    out_annotations_path.mkdir(parents=True, exist_ok=True)
     with open(out_annotations_path / "all.json", "w") as f:
         json.dump(coco.dataset, f)
 
