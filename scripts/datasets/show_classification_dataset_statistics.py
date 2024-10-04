@@ -71,7 +71,7 @@ def analyze_images(
         labels.update(os.listdir(subset_dir))
     labels = sorted(labels)
 
-    areas = []
+    sizes = []
     label_counts: dict[str, dict[str, int]] = defaultdict(dict)
     for subset in subsets:
         subset_dir = os.path.join(root_dir, subset)
@@ -84,8 +84,7 @@ def analyze_images(
                 # find max image size
                 for image in images:
                     with Image.open(image) as im:
-                        area = im.size[0] * im.size[1]
-                        areas.append(area)
+                        sizes.append(im.size)
 
                 count = len(images)
             else:
@@ -96,7 +95,7 @@ def analyze_images(
         count = sum(label_counts[subset].values())
         label_counts[subset]["all"] = count
 
-    return labels, label_counts, areas
+    return labels, label_counts, sizes
 
 
 def make_label_dist_plot(
@@ -125,7 +124,9 @@ def make_label_dist_plot(
     axes.set_ylim(0, max_count + 5000)
 
 
-def make_area_plot(axes: Axes, areas: list[float]):
+def make_area_plot(axes: Axes, sizes: list[float]):
+    areas = np.array([size[0] * size[1] for size in sizes])
+
     n_bins = 100
     N, bins, patches = axes.hist(areas, n_bins, color="orange")
     mean_bins = bins[:-1] + bins[1:]
@@ -135,7 +136,9 @@ def make_area_plot(axes: Axes, areas: list[float]):
     mode_bin = mean_bins[mode_i]
     patches[mode_i].set_facecolor("red")
 
-    print("Min, Max image area:", min(areas), max(areas))
+    min_i, max_i = areas.argmin(), areas.argmax()
+    print("Min, Max image size:", f"{sizes[min_i]}, {sizes[max_i]}")
+    print("Min, Max image area:", areas[min_i], areas[max_i])
     print("Average image area:", sum(areas) / len(areas))
     print(f"Mode image area: {bins[mode_i]} ~ {bins[mode_i + 1]}")
 
@@ -158,7 +161,7 @@ def show_classification_statistics(
     all_in_one: bool = False,
     excluded_subsets: list[str] = [],
 ):
-    labels, label_counts, areas = analyze_images(
+    labels, label_counts, sizes = analyze_images(
         root_dir, all_in_one=all_in_one, excluded_subsets=excluded_subsets
     )
 
@@ -171,7 +174,7 @@ def show_classification_statistics(
     fig.suptitle(title)
 
     make_label_dist_plot(axes_1, labels, label_counts, all_in_one=all_in_one)
-    make_area_plot(axes_2, areas)
+    make_area_plot(axes_2, sizes)
 
     fig.tight_layout()
     fig.savefig(f"{title}.png")
