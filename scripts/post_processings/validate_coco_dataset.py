@@ -61,6 +61,13 @@ def _validate_ids(coco: COCO):
     assert len(coco.anns) == len(coco.dataset["annotations"])
 
 
+def _validate_annotation_areas(coco: COCO):
+    assert all(
+        (ann["bbox"][2] * ann["bbox"][3]) == ann["area"] and ann["area"] > 0
+        for ann in coco.dataset["annotations"]
+    )
+
+
 def _draw_bounding_box(image: Image.Image, coord: tuple[int, int, int, int]):
     x, y, w, h = coord
 
@@ -107,7 +114,7 @@ def validate_coco_dataset(
     for annotation_file in annotation_files:
         coco = COCO(annotation_file)
         _validate_ids(coco)
-
+        _validate_annotation_areas(coco)
         if show:
             _show_annotations(coco, images_path, num_annotations=show_num_images)
 
@@ -148,6 +155,7 @@ def validate_coco_dataset(
             for annotation_file in annotation_files:
                 coco = COCO(annotation_file)
                 _validate_ids(coco)
+                _validate_annotation_areas(coco)
                 if is_major_vote:
                     subset_image_ids[annotation_file.stem].extend(coco.imgs.keys())
                     subset_annotation_ids[annotation_file.stem].extend(coco.anns.keys())
@@ -165,6 +173,7 @@ def validate_coco_dataset(
                 for annotation_file in all_annotation_files:
                     coco = COCO(annotation_file)
                     _validate_ids(coco)
+                    _validate_annotation_areas(coco)
                     assert sorted(coco.imgs.keys()) == sorted(
                         subset_image_ids[annotation_file.stem]
                     )
