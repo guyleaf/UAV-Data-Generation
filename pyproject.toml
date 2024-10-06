@@ -8,6 +8,8 @@ authors = [{ name = "Leaf Ying", email = "leaf.ying.cs11@nycu.edu.tw" }]
 readme = "README.md"
 requires-python = ">=3.10"
 version = "0.0.1"
+
+# these will be installed in blender env
 dependencies = [
     "pillow",
     "numpy < 2.0.0",
@@ -23,6 +25,7 @@ runtime = [
     "bpy ~= 3.5.0",
     "fake-bpy-module-3.5",
     "blenderproc < 3.0.0",
+    "torchmetrics[image] ~= 1.4.2",
 ]
 dev = [
     "uav_data_generation[runtime]",
@@ -37,8 +40,11 @@ dev = [
     "opencv-python-headless < 5.0.0.0",
     "compel",
     "pandas",
-    "fastdup; sys_platform != 'win32'",
+    # "fastdup; sys_platform != 'win32'",
 ]
+
+[project.scripts]
+uav-gen-eval = "uav_data_generation.evaluation:cli"
 
 [tool.hatch.build.targets.uav_data_generation]
 only-include = ["uav_data_generation"]
