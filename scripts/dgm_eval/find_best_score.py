@@ -11,7 +11,7 @@ def parse_args():
         description="Find the best epoch based on metrics.",
     )
     parser.add_argument(
-        "scores_file", type=str, help="The output scores file from dgm-eval."
+        "experiment_dir", type=str, help="The output experiment folder from dgm-eval."
     )
     parser.add_argument(
         "--iters",
@@ -36,7 +36,8 @@ def parse_args():
     parser.add_argument(
         "--order",
         type=str,
-        default="asc",
+        nargs="+",
+        default=["asc", "asc"],
         choices=["asc", "desc"],
         help="Which order of metric values is used in sorting. Sort in metrics.",
     )
@@ -54,8 +55,10 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
 
-    scores_file = Path(args.scores_file)
-    scores = np.load(scores_file, allow_pickle=True)
+    experiment_dir = Path(args.experiment_dir)
+    scores_file = list(experiment_dir.glob("*_scores_*.npz"))
+    assert len(scores_file) == 1
+    scores = np.load(scores_file[0], allow_pickle=True)
 
     test_datasets = scores["run_params"].item()["test_datasets"]
     scores = scores["scores"].item()
@@ -65,11 +68,17 @@ if __name__ == "__main__":
         iters = args.iters
         scores = {i: scores[i] for i in iters}
 
-    results = sorted(
-        scores.items(),
-        key=lambda score: (score[1][1][metric] for metric in args.metrics),
-        reverse=(args.order == "desc"),
-    )[: args.topk]
+    # python's sort is stable
+    # https://docs.python.org/3.10/howto/sorting.html#sort-stability-and-complex-sorts
+    results = list(scores.items())
+    for metric, order in reversed(list(zip(args.metrics, args.order))):
+        results.sort(key=lambda v: v[1][1][metric], reverse=(order == "desc"))
+    results = results[: args.topk]
+    # results = sorted(
+    #     scores.items(),
+    #     key=lambda score: tuple(score[1][1][metric] for metric in args.metrics),
+    #     reverse=(args.order == "desc"),
+    # )[: args.topk]
 
     print(f"Sort scores in metrics {args.order} order:", args.metrics)
     print("=========================")
