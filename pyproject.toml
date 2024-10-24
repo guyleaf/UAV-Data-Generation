@@ -7,16 +7,16 @@ name = "uav_data_generation"
 authors = [{ name = "Leaf Ying", email = "leaf.ying.cs11@nycu.edu.tw" }]
 readme = "README.md"
 requires-python = ">=3.10"
-version = "0.0.1"
+version = "0.1.0"
 
-# these will be installed in blender env
+# these will also be installed in blender env
 dependencies = [
-    "pillow",
-    "numpy < 2.0.0",
-    "matplotlib",
+    "pillow < 11",
+    "numpy < 2",
+    "matplotlib < 4",
     "pycocotools",
     "rich",
-    "scikit-learn < 2.0.0",
+    "scikit-learn < 2",
 ]
 
 [project.optional-dependencies]
@@ -24,20 +24,20 @@ runtime = [
     "awscli",
     "bpy ~= 3.5.0",
     "fake-bpy-module-3.5",
-    "blenderproc < 3.0.0",
-    "torchmetrics[image] ~= 1.4.2",
+    "blenderproc < 3",
+    "nuscenes-devkit",
 ]
 dev = [
     "uav_data_generation[runtime]",
-    "diffusers[torch] < 5.0.0",
-    "transformers < 5.0.0",
-    "accelerate < 1.0.0",
+    "diffusers[torch] < 5",
+    "transformers < 5",
+    "accelerate < 1",
     "safetensors",
     "controlnet-aux",
     "ipywidgets",
     "ipykernel",
     "invisible-watermark",
-    "opencv-python-headless < 5.0.0.0",
+    "opencv-python < 5",
     "compel",
     "pandas",
     # "fastdup; sys_platform != 'win32'",
@@ -48,6 +48,3 @@ uav-gen-eval = "uav_data_generation.evaluation:cli"
 
 [tool.hatch.build.targets.uav_data_generation]
 only-include = ["uav_data_generation"]
-
-[tool.ruff]
-target-version = "py310"
