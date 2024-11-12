@@ -1,4 +1,6 @@
 import argparse
+import itertools
+import math
 import os
 from collections import defaultdict
 from typing import Optional
@@ -7,7 +9,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import PIL.Image as Image
 from matplotlib.axes import Axes
-from matplotlib.ticker import PercentFormatter, ScalarFormatter
 from rich import print
 
 from uav_data_generation.utils.io import collect_images
@@ -71,13 +72,14 @@ def analyze_images(
         labels.update(os.listdir(subset_dir))
     labels = sorted(labels)
 
-    sizes = []
+    label_sizes: dict[str, dict[str, list[tuple[int, int]]]] = defaultdict(dict)
     label_counts: dict[str, dict[str, int]] = defaultdict(dict)
     for subset in subsets:
         subset_dir = os.path.join(root_dir, subset)
 
         for label in labels:
             label_dir = os.path.join(subset_dir, label)
+            sizes = []
             if os.path.isdir(label_dir):
                 images = collect_images(label_dir)
 
@@ -90,12 +92,16 @@ def analyze_images(
             else:
                 count = 0
 
+            label_sizes[subset][label] = sizes
             label_counts[subset][label] = count
 
         count = sum(label_counts[subset].values())
         label_counts[subset]["all"] = count
+        label_sizes[subset]["all"] = list(
+            itertools.chain.from_iterable(label_sizes[subset].values())
+        )
 
-    return labels, label_counts, sizes
+    return labels, label_counts, label_sizes
 
 
 def make_label_dist_plot(
@@ -118,41 +124,45 @@ def make_label_dist_plot(
     # axes.xaxis.set_ticks(x + (width * len(subsets)) / 2, labels)
     axes.xaxis.set_ticks(axes.xaxis.get_ticklocs()[1:-1], labels)
     if not all_in_one:
-        axes.legend(loc="upper left", ncols=3)
+        axes.legend(loc="upper left")
 
     max_count = max(max(counts.values()) for counts in label_counts.values())
     axes.set_ylim(0, max_count + 5000)
 
 
-def make_area_plot(axes: Axes, sizes: list[float]):
+def make_image_size_plot(
+    axes: Axes, sizes: list[tuple[int, int]], title: str = "Image Size"
+):
     areas = np.array([size[0] * size[1] for size in sizes])
 
-    n_bins = 100
-    N, bins, patches = axes.hist(areas, n_bins, color="orange")
-    mean_bins = bins[:-1] + bins[1:]
-    mean_bins /= 2
+    axes.scatter(*zip(*sizes))
 
-    mode_i = N.argmax()
-    mode_bin = mean_bins[mode_i]
-    patches[mode_i].set_facecolor("red")
+    # n_bins = 100
+    # N, bins, patches = axes.hist(areas, n_bins, color="orange")
+    # mean_bins = bins[:-1] + bins[1:]
+    # mean_bins /= 2
+
+    # mode_i = N.argmax()
+    # mode_bin = mean_bins[mode_i]
+    # patches[mode_i].set_facecolor("red")
 
     min_i, max_i = areas.argmin(), areas.argmax()
     print("Min, Max image size:", f"{sizes[min_i]}, {sizes[max_i]}")
     print("Min, Max image area:", areas[min_i], areas[max_i])
     print("Average image area:", sum(areas) / len(areas))
-    print(f"Mode image area: {bins[mode_i]} ~ {bins[mode_i + 1]}")
+    # print(f"Mode image area: {bins[mode_i]} ~ {bins[mode_i + 1]}")
 
-    xticks = axes.get_xticks()[1:-1]
-    xticklabels = axes.get_xticklabels()[1:-1]
-    axes.set_xticks([*xticks, mode_bin], [*xticklabels, mode_bin])
-    axes.set_xlabel("Area (pixels)")
-    axes.set_ylabel("Number of images")
-    axes.set_title("Image Area")
+    # xticks = axes.get_xticks()[1:-1]
+    # xticklabels = axes.get_xticklabels()[1:-1]
+    # axes.set_xticks([*xticks, mode_bin], [*xticklabels, mode_bin])
+    axes.set_xlabel("Width (pixels)")
+    axes.set_ylabel("Height (pixels)")
+    axes.set_title(title)
 
-    x_axis_formatter = ScalarFormatter()
-    x_axis_formatter.set_scientific(True)
-    axes.xaxis.set_major_formatter(x_axis_formatter)
-    axes.yaxis.set_major_formatter(PercentFormatter(xmax=len(areas)))
+    # x_axis_formatter = ScalarFormatter()
+    # x_axis_formatter.set_scientific(True)
+    # axes.xaxis.set_major_formatter(x_axis_formatter)
+    # axes.yaxis.set_major_formatter(PercentFormatter(xmax=len(areas)))
 
 
 def show_classification_statistics(
@@ -161,22 +171,31 @@ def show_classification_statistics(
     all_in_one: bool = False,
     excluded_subsets: list[str] = [],
 ):
-    labels, label_counts, sizes = analyze_images(
+    labels, label_counts, label_sizes = analyze_images(
         root_dir, all_in_one=all_in_one, excluded_subsets=excluded_subsets
     )
 
     if title is None:
         title = root_dir.removesuffix(os.sep).split(os.sep)[-1]
 
-    axes_1: Axes
-    axes_2: Axes
-    fig, (axes_1, axes_2) = plt.subplots(ncols=2, figsize=(15, 5))
+    num_cols = 3
+    num_rows = math.ceil((len(labels) * len(label_sizes) + 1) / num_cols)
+    fig, axess = plt.subplots(nrows=num_rows, ncols=num_cols, figsize=(20, 25))
     fig.suptitle(title)
 
-    make_label_dist_plot(axes_1, labels, label_counts, all_in_one=all_in_one)
-    make_area_plot(axes_2, sizes)
+    axess = list(itertools.chain.from_iterable(axess))
+    axes = axess.pop(0)
+    make_label_dist_plot(axes, labels, label_counts, all_in_one=all_in_one)
 
-    fig.tight_layout()
+    for subset, label_to_sizes in label_sizes.items():
+        for label, sizes in label_to_sizes.items():
+            sub_title = f"Image Size ({subset}, {label})"
+            print(sub_title)
+            axes = axess.pop(0)
+            make_image_size_plot(axes, sizes, title=sub_title)
+            print()
+
+    fig.tight_layout(rect=[0, 0.03, 1, 0.95])
     fig.savefig(f"{title}.png")
     plt.close(fig)
 
