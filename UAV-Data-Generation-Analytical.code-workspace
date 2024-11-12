@@ -1,0 +1,41 @@
+{
+	"folders": [
+		{
+			"name": "UAV-Data-Generation",
+			"path": "."
+		},
+		{
+			"name": "work_dirs",
+			"path": "../../work/work_dirs"
+		},
+		{
+			"name": "experiments",
+			"path": "../../work/experiments"
+		},
+		{
+			"name": "checkpoints",
+			"path": "../../data/checkpoints"
+		},
+		{
+			"name": "archive",
+			"path": "../../archive"
+		},
+		{
+			"path": "../Weather_Effect_Generator"
+		},
+		{
+			"path": "../Depth-Anything"
+		}
+	],
+	"settings": {
+		"python.analysis.exclude": [
+			"**/node_modules",
+			"**/__pycache__",
+			"**/.*",
+			"${workspaceFolder:work_dirs}",
+			"${workspaceFolder:archive}",
+			"${workspaceFolder:experiments}",
+			"${workspaceFolder:checkpoints}"
+		],
+	}
+}
