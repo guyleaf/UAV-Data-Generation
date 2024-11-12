@@ -12,9 +12,14 @@ def collect_images(path: Union[str, Path]) -> list[Path]:
 
     path = Path(path)
     if path.is_dir():
-        return sorted(filter(validate_file_type, path.rglob("*.*")))
+        images = filter(validate_file_type, path.rglob("*.*"))
     else:
-        return [path]
+        images = [path]
+
+    # if as_posix:
+    #     images = map(methodcaller("as_posix"), images)
+
+    return sorted(images)
 
 
 def collect_images_from_images(
