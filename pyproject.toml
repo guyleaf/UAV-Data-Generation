@@ -22,24 +22,29 @@ dependencies = [
 [project.optional-dependencies]
 runtime = [
     "awscli",
+    "boto3",
     "bpy ~= 3.5.0",
     "fake-bpy-module-3.5",
     "blenderproc < 3",
     "nuscenes-devkit",
+    "transformers < 5",
+    "safetensors",
+    "packaging",
+    "torch~=2.4.1",
+    "torchvision~=0.19.1",
+    "opencv-python<5",
 ]
 dev = [
     "uav_data_generation[runtime]",
     "diffusers[torch] < 5",
-    "transformers < 5",
     "accelerate < 1",
-    "safetensors",
     "controlnet-aux",
     "ipywidgets",
     "ipykernel",
     "invisible-watermark",
-    "opencv-python < 5",
     "compel",
     "pandas",
+    "boto3-stubs[boto3,s3]",
     # "fastdup; sys_platform != 'win32'",
 ]
 
