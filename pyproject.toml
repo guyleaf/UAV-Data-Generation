@@ -25,14 +25,15 @@ runtime = [
     "boto3",
     "bpy ~= 3.5.0",
     "fake-bpy-module-3.5",
-    "blenderproc < 3",
+    # after 2.8.0, we need to upgrade blender from 3.5.1 to 4.2.1
+    "blenderproc ~= 2.7.2",
     "nuscenes-devkit",
     "transformers < 5",
     "safetensors",
     "packaging",
-    "torch~=2.4.1",
-    "torchvision~=0.19.1",
-    "opencv-python<5",
+    "torch ~= 2.4.1",
+    "torchvision ~= 0.19.1",
+    "opencv-python < 5",
 ]
 dev = [
     "uav_data_generation[runtime]",
