@@ -45,7 +45,7 @@ def parse_args():
         "--excluded-subsets",
         type=str,
         nargs="+",
-        default=[],
+        default=["test"],
         help="don't count in these subsets",
     )
     args = parser.parse_args()
@@ -124,7 +124,7 @@ def make_label_dist_plot(
     # axes.xaxis.set_ticks(x + (width * len(subsets)) / 2, labels)
     axes.xaxis.set_ticks(axes.xaxis.get_ticklocs()[1:-1], labels)
     if not all_in_one:
-        axes.legend(loc="upper left")
+        axes.legend(loc="upper right")
 
     max_count = max(max(counts.values()) for counts in label_counts.values())
     axes.set_ylim(0, max_count + 5000)
