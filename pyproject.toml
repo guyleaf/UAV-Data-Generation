@@ -47,6 +47,8 @@ dev = [
     "pandas",
     "boto3-stubs[boto3,s3]",
     # "fastdup; sys_platform != 'win32'",
+    "mkdocs",
+    "mkdocs-material",
 ]
 
 [project.scripts]
