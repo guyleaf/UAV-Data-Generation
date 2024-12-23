@@ -49,6 +49,7 @@ dev = [
     # "fastdup; sys_platform != 'win32'",
     "mkdocs",
     "mkdocs-material",
+    "mkdocs-git-revision-date-localized-plugin",
 ]
 
 [project.scripts]

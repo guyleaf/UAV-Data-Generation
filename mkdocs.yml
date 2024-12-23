@@ -1,4 +1,5 @@
 site_name: Documentation for UAV data generation
+repo_url: https://github.com/guyleaf/UAV-Data-Generation
 theme:
   name: material
   palette:
@@ -15,3 +16,10 @@ theme:
       toggle:
         icon: material/weather-night
         name: Switch to light mode
+  features:
+    - search.suggest
+    - search.highlight
+plugins:
+  - search
+  - git-revision-date-localized:
+      enable_creation_date: true
