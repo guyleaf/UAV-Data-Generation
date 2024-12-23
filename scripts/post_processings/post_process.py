@@ -9,7 +9,8 @@ from PIL import Image
 from pycocotools.coco import COCO
 from rich import print
 from rich.progress import track
-from sklearn.model_selection import train_test_split
+
+from uav_data_generation.utils.dataset import split_into_train_val
 
 NOT_TO_COPY_KEYS = {"images", "annotations"}
 
@@ -33,17 +34,23 @@ def parse_args():
         help="relative path of COCO annotation file",
     )
     parser.add_argument(
-        "--out-dir",
+        "--images-out-dir",
         type=str,
         default=None,
-        help="root folder of the output dataset. If None, storing in the root_dir.",
+        help="relative path of the images output folder. If None, not to copy images.",
     )
     parser.add_argument(
-        "--copy",
-        action=argparse.BooleanOptionalAction,
-        default=False,
-        help="always copy images. If False and root_dir == out_dir, then not perform copying. Otherwise, perform copying.",
+        "--annotation-out-dir",
+        type=str,
+        default="annotations",
+        help="relative path of annotation output folder",
     )
+    # parser.add_argument(
+    #     "--copy",
+    #     action=argparse.BooleanOptionalAction,
+    #     default=False,
+    #     help="always copy images. If False and root_dir == out_dir, then not perform copying. Otherwise, perform copying.",
+    # )
 
     parser.add_argument(
         "--val-ratio", type=float, default=0.333, help="ratio for validation subset"
@@ -54,25 +61,9 @@ def parse_args():
 
     args = parser.parse_args()
 
-    if args.out_dir is None:
-        args.out_dir = args.root_dir
     assert 0 <= args.val_ratio <= 1, "The val_ratio should be in [0, 1]."
 
     return args
-
-
-def split_into_train_val(
-    x: list, val_ratio: float, seed: int, labels: Optional[list] = None
-):
-    if val_ratio < 1.0:
-        train, val = train_test_split(
-            x, test_size=val_ratio, random_state=seed, stratify=labels
-        )
-    else:
-        val = x
-        train = []
-
-    return {"train": train, "val": val}
 
 
 def update_coco_annotation(coco: COCO, images_path: Path):
@@ -139,15 +130,14 @@ def split_coco_annotation(
 
 def post_process(
     root_dir: Union[str, Path],
-    out_dir: Union[str, Path],
     images_dir: str = "stylized",
     annotation_file: str = "annotations/foreground.json",
-    copy: bool = False,
+    images_out_dir: Optional[str] = None,
+    annotation_out_dir: str = "annotations",
     val_ratio: float = 0.333,
     seed: int = 2024,
 ):
     root_path = Path(root_dir)
-    out_path = Path(out_dir)
     images_path = root_path / images_dir
 
     # load coco annotation
@@ -157,7 +147,8 @@ def post_process(
     coco = update_coco_annotation(coco, images_path)
 
     # 2. save the updated coco annotation
-    out_annotations_path = out_path / "annotations"
+    out_annotations_path = root_path / annotation_out_dir
+    out_annotations_path.mkdir(parents=True, exist_ok=True)
     with open(out_annotations_path / "all.json", "w") as f:
         json.dump(coco.dataset, f)
 
@@ -170,11 +161,11 @@ def post_process(
             json.dump(coco.dataset, f)
 
     # 5. copy images if necessary
-    if copy or root_path != out_path:
-        out_path.mkdir(parents=True, exist_ok=True)
-        out_images_path = out_path / "images"
+    if images_out_dir is not None:
+        out_images_path = root_path / images_out_dir
         if out_images_path.exists():
             shutil.rmtree(out_images_path)
+        out_images_path.mkdir(parents=True, exist_ok=True)
         shutil.copytree(images_path, out_images_path)
 
 

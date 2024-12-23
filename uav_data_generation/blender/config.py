@@ -1,6 +1,7 @@
+import importlib.util
 import os
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Type
 
 AREA_RANGES = tuple[tuple[int, int], tuple[int, int], tuple[int, int]]
 
@@ -40,7 +41,7 @@ class BaseConfig(ABC):
     # The angle range of z-axis in degree.
     z_range: tuple[int, int] = (0, 360)
     # The maximum number of UAVs per image.
-    max_samples: int = 20
+    sample_range: tuple[int, int] = (1, 20)
 
     # Enable adaptive alignment with the step (useful with motion blur).
     adaptive_alignment: bool = True
@@ -104,6 +105,15 @@ class BaseConfig(ABC):
         )
         return list(attrs)
 
+    @classmethod
+    def from_file(cls, path: str, class_name: str = "Config"):
+        spec = importlib.util.spec_from_file_location("cfg", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        cfg: Type[cls] = getattr(module, class_name)
+        return cfg()
+
     def validate_args(self) -> None:
         assert self.scene_path.endswith(
             ".blend"
@@ -118,8 +128,8 @@ class BaseConfig(ABC):
             ), f"The left of range should be less than or equal to the right, {range_}."
 
         assert (
-            0 < self.max_samples
-        ), "The maximum number of samples should be greater than 0."
+            0 <= self.sample_range[0] <= self.sample_range[1]
+        ), "Invalid sample range format."
         assert (
             len(self.area_ranges) == 3
         ), "The area ranges should contain three ranges, small, medium, and large."

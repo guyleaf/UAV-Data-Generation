@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling", "hatch-requirements-txt"]
+requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
@@ -7,15 +7,53 @@ name = "uav_data_generation"
 authors = [{ name = "Leaf Ying", email = "leaf.ying.cs11@nycu.edu.tw" }]
 readme = "README.md"
 requires-python = ">=3.10"
-version = "0.0.1"
-dynamic = ["dependencies"]
+version = "0.1.0"
 
-[tool.hatch.build.targets.uav_detection]
+# these will also be installed in blender env
+dependencies = [
+    "pillow < 11",
+    "numpy < 2",
+    "matplotlib < 4",
+    "pycocotools",
+    "rich",
+    "scikit-learn < 2",
+]
+
+[project.optional-dependencies]
+runtime = [
+    "awscli",
+    "boto3",
+    "bpy ~= 3.5.0",
+    "fake-bpy-module-3.5",
+    # after 2.8.0, we need to upgrade blender from 3.5.1 to 4.2.1
+    "blenderproc ~= 2.7.2",
+    "nuscenes-devkit",
+    "transformers < 5",
+    "safetensors",
+    "packaging",
+    "torch ~= 2.4.1",
+    "torchvision ~= 0.19.1",
+    "opencv-python < 5",
+]
+dev = [
+    "uav_data_generation[runtime]",
+    "diffusers[torch] < 5",
+    "accelerate < 1",
+    "controlnet-aux",
+    "ipywidgets",
+    "ipykernel",
+    "invisible-watermark",
+    "compel",
+    "pandas",
+    "boto3-stubs[boto3,s3]",
+    # "fastdup; sys_platform != 'win32'",
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocs-git-revision-date-localized-plugin",
+]
+
+[project.scripts]
+uav-gen-eval = "uav_data_generation.evaluation:cli"
+
+[tool.hatch.build.targets.uav_data_generation]
 only-include = ["uav_data_generation"]
-
-[tool.hatch.metadata.hooks.requirements_txt]
-files = ["requirements/blender_requirements.txt"]
-
-[tool.ruff]
-# Always generate Python 3.9-compatible code.
-target-version = "py310"

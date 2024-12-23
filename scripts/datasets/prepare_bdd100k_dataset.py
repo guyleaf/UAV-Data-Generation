@@ -103,13 +103,11 @@ def prepare_bdd100k_dataset(
         if not all_in_one:
             subset_out_dir /= subset
 
-        for weather in WEATHER_MAP.values():
-            (subset_out_dir / weather).mkdir(parents=True, exist_ok=True)
-
         if legacy:
             label_file = root_dir / "labels" / f"bdd100k_labels_images_{subset}.json"
         else:
             label_file = root_dir / "labels" / "det_20" / f"det_{subset}.json"
+
         if label_file.exists():
             with open(label_file, "r") as f:
                 labels = json.load(f)
@@ -124,13 +122,10 @@ def prepare_bdd100k_dataset(
 
                 image_file = subset_root_dir / image_name
                 weather_out_dir = subset_out_dir / weather
+                weather_out_dir.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(image_file, weather_out_dir)
         else:
-            for image_file in tqdm.tqdm(
-                subset_root_dir.iterdir(), desc=f"{subset.capitalize()} image"
-            ):
-                subset_out_dir.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(image_file, subset_out_dir)
+            shutil.copytree(subset_root_dir, subset_out_dir, dirs_exist_ok=True)
 
 
 if __name__ == "__main__":

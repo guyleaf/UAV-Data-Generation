@@ -1,0 +1,25 @@
+site_name: Documentation for UAV data generation
+repo_url: https://github.com/guyleaf/UAV-Data-Generation
+theme:
+  name: material
+  palette:
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+  features:
+    - search.suggest
+    - search.highlight
+plugins:
+  - search
+  - git-revision-date-localized:
+      enable_creation_date: true

@@ -30,5 +30,4 @@ set -eu
 
 blenderproc run -- "$(dirname "$0")/generate_foregrounds.py" \
 configs/weather_anti_uav_t.py \
---out-dir ~/data/UAV/Weather_Anti_UAV_T_NO_RETRY_AREA \
---devices 0
+--devices 0 --resume

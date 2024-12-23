@@ -133,9 +133,9 @@ def prepare_backgrounds(
     dry_run: bool = False,
     fake_only: bool = False,
 ) -> None:
-    backgrounds_dir = out_dir / "backgrounds"
+    # out_dir = out_dir / "backgrounds"
     if not dry_run:
-        if backgrounds_dir.exists():
+        if out_dir.exists():
             print("[bold green]Backgrounds folder exists![/bold green]")
             answer = Confirm.ask(
                 "Do you want to continue? ([bold red]will be deleted before processing[/bold red])",
@@ -144,9 +144,9 @@ def prepare_backgrounds(
             if not answer:
                 exit()
 
-            shutil.rmtree(backgrounds_dir)
+            shutil.rmtree(out_dir)
 
-        backgrounds_dir.mkdir(parents=True, exist_ok=True)
+        out_dir.mkdir(parents=True, exist_ok=True)
 
     label_to_images = defaultdict[str, list[tuple[str, Path]]](list)
     for name, root_dir in track(datasets.items(), description="Collecting..."):
@@ -205,7 +205,7 @@ def prepare_backgrounds(
             for name, image in track(
                 images, description=f"Processing {label} images..."
             ):
-                label_dir = backgrounds_dir / name / label
+                label_dir = out_dir / name / label
                 label_dir.mkdir(parents=True, exist_ok=True)
 
                 data = Image.open(image)
@@ -225,7 +225,7 @@ def prepare_backgrounds(
                 enumerate(fake_images),
                 description=f"Processing {label} fake style images...",
             ):
-                label_dir = backgrounds_dir / f"{name}_fake_style" / label
+                label_dir = out_dir / f"{name}_fake_style" / label
                 label_dir.mkdir(parents=True, exist_ok=True)
 
                 data = Image.open(image)

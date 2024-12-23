@@ -193,3 +193,4 @@ output/
 outputs/
 wandb/
 test/
+thirdparty/
