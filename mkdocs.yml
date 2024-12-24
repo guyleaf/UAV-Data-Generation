@@ -19,6 +19,8 @@ theme:
     - search.suggest
     - search.highlight
     - navigation.tracking
+    # - navigation.tabs
+    # - navigation.sections
     - navigation.top
     - content.code.copy
 
