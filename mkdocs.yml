@@ -1,5 +1,4 @@
 site_name: Documentation for UAV data generation
-repo_url: https://github.com/guyleaf/UAV-Data-Generation
 theme:
   name: material
   palette:
@@ -19,7 +18,29 @@ theme:
   features:
     - search.suggest
     - search.highlight
+    - navigation.tracking
+    - navigation.top
+    - content.code.copy
+
 plugins:
   - search
   - git-revision-date-localized:
       enable_creation_date: true
+  - git-authors
+
+markdown_extensions:
+  - toc:
+      permalink: true
+  - admonition
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
