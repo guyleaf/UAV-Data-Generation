@@ -19,10 +19,12 @@ theme:
     - search.suggest
     - search.highlight
     - navigation.tracking
-    # - navigation.tabs
+    - navigation.tabs
     # - navigation.sections
     - navigation.top
     - content.code.copy
+    - navigation.footer
+    - navigation.indexes
 
 plugins:
   - search
@@ -40,9 +42,28 @@ markdown_extensions:
       line_spans: __span
       pygments_lang_class: true
   - pymdownx.inlinehilite
-  - pymdownx.snippets
+  - pymdownx.snippets:
+      check_paths: true
+      base_path: [".", ".."]
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
+
+nav:
+  - README.md
+  - Getting started:
+    - getting-started/index.md
+    - getting-started/installation.md
+    - getting-started/downloads.md
+    - getting-started/pre-processing.md
+    - getting-started/uav-generation.md
+    - getting-started/harmonization.md
+    - getting-started/weather-stylization.md
+    - getting-started/post-processing.md
+  - Design:
+    - design/dataset.md
+  - Datasets:
+    - datasets/weather-anti-uav.md
+  - resources.md
