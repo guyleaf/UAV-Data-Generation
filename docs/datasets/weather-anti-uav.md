@@ -1,3 +1,0 @@
-# Weather Anti-UAV
-
-## Environment

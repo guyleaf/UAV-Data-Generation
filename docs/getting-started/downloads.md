@@ -47,4 +47,4 @@ Decompress it to a folder.
 
 * [Google Drive (permission required)](https://drive.google.com/file/d/1YEW_SlM_R7qLyaqJdS3NMnRWrmtLFzLl/view?usp=drive_link)
 
-For more details about the resources, see [Resources](../resources.md)
+For more details about the resources, see [Resources](../resources.md).

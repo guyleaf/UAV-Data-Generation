@@ -52,7 +52,7 @@ markdown_extensions:
           format: !!python/name:pymdownx.superfences.fence_code_format
 
 nav:
-  - README.md
+  - index.md
   - Getting started:
     - getting-started/index.md
     - getting-started/installation.md
@@ -62,8 +62,13 @@ nav:
     - getting-started/harmonization.md
     - getting-started/weather-stylization.md
     - getting-started/post-processing.md
+  - User guides:
+    - user-guides/blender.md
+    - user-guides/parameters.md
+    - user-guides/checkpoint.md
+  - Presets:
+    - presets/weather-anti-uav.md
   - Design:
     - design/dataset.md
-  - Datasets:
-    - datasets/weather-anti-uav.md
+    - design/blender.md
   - resources.md

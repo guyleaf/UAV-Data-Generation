@@ -1,4 +1,4 @@
-# Applying weather stylization (Experimental)
+# Applying weather stylization (Experimental) (Optional)
 !!! warning
     It is still in experimental. The method may change in the future.
 
@@ -19,7 +19,7 @@ conda env create -f environment.yml
 ## Pre-trained weight
 Download the compression file and place it in `checkpoints/` folder.
 
-* Foggy, Rainy, Snowy: [Google Drive](https://drive.google.com/file/d/1aC13wPYu-2aykKXnMIAMpHhtkKLpvNDy/view?usp=drive_link)
+* Foggy (NuScenes + Foggy Zurich), Rainy (NuScenes), Snowy (Boreas) : [Google Drive](https://drive.google.com/file/d/1aC13wPYu-2aykKXnMIAMpHhtkKLpvNDy/view?usp=drive_link)
 
 ```bash
 mkdir checkpoints

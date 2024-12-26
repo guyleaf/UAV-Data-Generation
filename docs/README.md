@@ -1,17 +1,11 @@
-# Overview
+# Documentation for UAV data generation
 
-For full documentation visit [mkdocs.org](https://www.mkdocs.org).
+## Usage
+View documentation with http server.
 
-## Commands
+```bash
+conda activate uav_data_generation
+mkdocs serve
+```
 
-* `mkdocs new [dir-name]` - Create a new project.
-* `mkdocs serve` - Start the live-reloading docs server.
-* `mkdocs build` - Build the documentation site.
-* `mkdocs -h` - Print help message and exit.
-
-## Project layout
-
-    mkdocs.yml    # The configuration file.
-    docs/
-        index.md  # The documentation homepage.
-        ...       # Other markdown pages, images and other files.
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000/).
