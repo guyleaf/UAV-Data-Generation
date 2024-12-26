@@ -20,10 +20,9 @@ class BaseConfig(ABC):
         raise NotImplementedError
 
     @property
-    @abstractmethod
     def images_path(self) -> str:
         """Path to the folder of image files"""
-        raise NotImplementedError
+        return os.path.join(self.out_dir, "backgrounds")
 
     # # Path to the .blend scene file
     # scene_path: str

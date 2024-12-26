@@ -16,10 +16,6 @@ class Config(BaseConfig):
             "~/data/UAV/blender/assets/backgrounds/studiolights/city.exr"
         )
 
-    @property
-    def images_path(self) -> str:
-        return os.path.expanduser("~/data/UAV/Weather_Anti_UAV_S/backgrounds")
-
     x_range: tuple[int, int] = (-30, 30)
     y_range: tuple[int, int] = (-30, 30)
     max_iof: float = 0.2
