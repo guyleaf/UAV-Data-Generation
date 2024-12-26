@@ -1,7 +1,4 @@
 import argparse
-import itertools
-import warnings
-from collections import defaultdict
 from pathlib import Path
 
 import PIL.Image as Image
@@ -39,16 +36,6 @@ def parse_args():
     )
     parser.add_argument(
         "--show-num-images", type=int, default=5, help="number of images to be shown"
-    )
-    parser.add_argument(
-        "--types-of-label",
-        type=str,
-        nargs="*",
-        default=[],
-        help="validate these extra annotations. Note, the folder structure should follow the format of COCO dataset with labels",
-    )
-    parser.add_argument(
-        "--votes", type=str, nargs="+", default=["major_vote", "weighted_vote"]
     )
     args = parser.parse_args()
 
@@ -101,8 +88,6 @@ def validate_coco_dataset(
     annotations_dir: str = "annotations",
     show: bool = False,
     show_num_images: int = 5,
-    types_of_label: list[str] = [],
-    votes: list[str] = ["major_vote", "weighted_vote"],
 ):
     if not root_dir.exists():
         raise RuntimeError(f"The root folder {root_dir.name} is not found.")
@@ -117,69 +102,6 @@ def validate_coco_dataset(
         _validate_annotation_areas(coco)
         if show:
             _show_annotations(coco, images_path, num_annotations=show_num_images)
-
-    # check extra annotation files (e.g. weather)
-    for type_of_label in types_of_label:
-        type_of_label_dir = root_dir / type_of_label
-        if not type_of_label_dir.exists():
-            raise RuntimeError(
-                f"The type of label folder {type_of_label_dir.name} is not found."
-            )
-
-        for vote in votes:
-            root_annotation_dir = type_of_label_dir / vote
-            if not root_annotation_dir.exists():
-                warnings.warn(
-                    f"The vote of folder {root_annotation_dir.name} is not found."
-                )
-                continue
-            is_major_vote = vote == "major_vote"
-
-            print(f"Checking {root_annotation_dir}...")
-
-            annotation_dirs = filter(
-                lambda label_dir: label_dir.name != "all",
-                root_annotation_dir.glob("*"),
-            )
-            annotation_files = list(
-                itertools.chain.from_iterable(
-                    annotation_dir.glob(ANNOTATION_SEARCH_PATTERN)
-                    for annotation_dir in annotation_dirs
-                )
-            )
-
-            print(f"Found {len(annotation_files)} annotation files.")
-
-            subset_image_ids = defaultdict(list)
-            subset_annotation_ids = defaultdict(list)
-            for annotation_file in annotation_files:
-                coco = COCO(annotation_file)
-                _validate_ids(coco)
-                _validate_annotation_areas(coco)
-                if is_major_vote:
-                    subset_image_ids[annotation_file.stem].extend(coco.imgs.keys())
-                    subset_annotation_ids[annotation_file.stem].extend(coco.anns.keys())
-
-                if show:
-                    _show_annotations(
-                        coco, images_path, num_annotations=show_num_images
-                    )
-
-            # by default, the annotation files in "all" folder must be matched with its split annotation files
-            if is_major_vote:
-                all_annotation_files = (type_of_label_dir / "all").glob(
-                    ANNOTATION_SEARCH_PATTERN
-                )
-                for annotation_file in all_annotation_files:
-                    coco = COCO(annotation_file)
-                    _validate_ids(coco)
-                    _validate_annotation_areas(coco)
-                    assert sorted(coco.imgs.keys()) == sorted(
-                        subset_image_ids[annotation_file.stem]
-                    )
-                    assert sorted(coco.anns.keys()) == sorted(
-                        subset_annotation_ids[annotation_file.stem]
-                    )
 
     print("No errors!")
 

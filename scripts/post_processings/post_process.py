@@ -53,7 +53,7 @@ def parse_args():
     # )
 
     parser.add_argument(
-        "--val-ratio", type=float, default=0.333, help="ratio for validation subset"
+        "--val-ratio", type=float, default=0.3333, help="ratio for validation subset"
     )
     parser.add_argument(
         "--seed", type=int, default=2024, help="seed for random splitting"
