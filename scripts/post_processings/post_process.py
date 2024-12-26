@@ -165,7 +165,6 @@ def post_process(
         out_images_path = root_path / images_out_dir
         if out_images_path.exists():
             shutil.rmtree(out_images_path)
-        out_images_path.mkdir(parents=True, exist_ok=True)
         shutil.copytree(images_path, out_images_path)
 
 
