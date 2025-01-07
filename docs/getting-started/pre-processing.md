@@ -26,5 +26,5 @@ By default, all rotary-wing UAVs are enabled and the textures are used in random
 
 For more details about blender scene:
 
-* The system design? see [Blender in Design](../design/blender.md).
-* How to customize it? see [Blender customization in User guides](../user-guides/blender.md).
+* The system design? see [UAV generation in Design](../design/uav-generation.md).
+* How to customize it? see [Blender customization in User guides](../user-guides/customization.md).
