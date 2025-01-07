@@ -49,7 +49,9 @@ class BaseConfig(ABC):
     # Increase the alignment distance with the step (m) (--adaptive-alignment only).
     alignment_z_step: float = 1e-3
 
-    # The maximum IoF (check overlap / bbox1 & overlap / bbox2) among UAVs in image. (max_iof > 0 -> accept occlusion)
+    # The maximum IoF among UAVs in image. (max_iof > 0 -> accept occlusion)
+    # IoF (intersection over foreground) = overlap / bbox
+    # referenced from mmdetection
     max_iof: float = 0.2
     # The area ranges [a, b) for small, medium, large.
     area_ranges: AREA_RANGES = (
