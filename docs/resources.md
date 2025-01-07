@@ -21,3 +21,6 @@ All models are copied and modified from these repositories.
 - [PX4-SITL_gazebo-classic](https://github.com/PX4/PX4-SITL_gazebo-classic)
 - [px4_gazebo](https://github.com/antonellabarisic/px4_gazebo)
 - [SITL_Models](https://github.com/ArduPilot/SITL_Models)
+
+### Useful reference
+- [IOR / Index of Refraction List](https://pixelandpoly.com/ior.html)

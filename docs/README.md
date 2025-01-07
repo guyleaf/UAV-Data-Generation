@@ -1,5 +1,8 @@
 # Documentation for UAV data generation
 
+## Installation
+Please check [the installation document](getting-started/installation.md).
+
 ## Usage
 View documentation with http server.
 

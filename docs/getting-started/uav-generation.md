@@ -5,7 +5,7 @@ Please fill the parameters `<...>` (highlight) in the config file before running
 
 For more details, see [Parameters in User guides](../user-guides/parameters.md).
 
-```python title="configs/weather_anti_uav_t.py" linenums="1" hl_lines="14 20 40"
+```python title="configs/weather_anti_uav_t.py" linenums="1" hl_lines="14 20 36"
 --8<-- "configs/weather_anti_uav_t.py"
 ```
 
@@ -29,6 +29,8 @@ blenderproc run -- "scripts/blender/generate_foregrounds.py" \
 blenderproc run -- "scripts/blender/generate_foregrounds.py" \
     configs/weather_anti_uav_t.py \
     --devices 1
+
+# saved in Weather_Anti_UAV_T/foregrounds and Weather_Anti_UAV_T/annotations/foreground.json
 ```
 
 For more details about how to use it, run with `-h` option or see the arguments in the script, `scripts/blender/generate_foregrounds.py`.
