@@ -50,7 +50,8 @@ dev = [
     "mkdocs",
     "mkdocs-material",
     "mkdocs-git-revision-date-localized-plugin",
-    "mkdocs-git-authors-plugin"
+    "mkdocs-git-authors-plugin",
+    "mkdocs-glightbox"
 ]
 
 [project.scripts]

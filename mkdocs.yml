@@ -19,7 +19,7 @@ theme:
     - search.suggest
     - search.highlight
     - navigation.tracking
-    - navigation.tabs
+    # - navigation.tabs
     # - navigation.sections
     - navigation.top
     - content.code.copy
@@ -31,6 +31,7 @@ plugins:
   - git-revision-date-localized:
       enable_creation_date: true
   - git-authors
+  - glightbox
 
 markdown_extensions:
   - toc:
@@ -50,6 +51,8 @@ markdown_extensions:
         - name: mermaid
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
+  - attr_list
+  - md_in_html
 
 nav:
   - index.md
@@ -63,12 +66,12 @@ nav:
     - getting-started/weather-stylization.md
     - getting-started/post-processing.md
   - User guides:
-    - user-guides/blender.md
+    - user-guides/customization.md
     - user-guides/parameters.md
     - user-guides/checkpoint.md
   - Presets:
     - presets/weather-anti-uav.md
   - Design:
     - design/dataset.md
-    - design/blender.md
+    - design/uav-generation.md
   - resources.md
