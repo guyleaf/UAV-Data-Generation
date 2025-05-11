@@ -26,14 +26,14 @@ def group_and_filter_material_slots_by_cp(
     group_cp_name: str = "group_name",
     filter_cp_name: str = "material_randomization",
 ) -> dict[str, list[tuple[MeshObject, int]]]:
-    def get_cp_values(obj: MeshObject, cp_name: str, default):
+    def get_cp_values(obj: MeshObject, cp_name: str, defaults):
         """
         Get a list of values from custom property
             1. if the cp_name is not defined, use the default value.
             2. if the cp_value is a single value, broadcast to every slot
             3. if the cp_value is a list, use it directly.
         """
-        cp_values = get_cp(obj, cp_name, default=default)
+        cp_values = get_cp(obj, cp_name, default=defaults)
         if isinstance(cp_values, idprop.types.IDPropertyArray):
             cp_values = cp_values.to_list()
 
@@ -61,14 +61,14 @@ def group_and_filter_material_slots_by_cp(
         # grouping by group_cp_name
         default_value = [f"{name}_{i}" for i in range(num_slots)]
         group_cp_values: list[str] = get_cp_values(
-            mesh, group_cp_name, default=default_value
+            mesh, group_cp_name, defaults=default_value
         )
         assert all(isinstance(cp_value, str) for cp_value in group_cp_values)
 
         # filtering by filter_cp_name
         default_value = [default_filter_cp_value] * num_slots
         filter_cp_values: list[bool] = get_cp_values(
-            mesh, filter_cp_name, default=default_value
+            mesh, filter_cp_name, defaults=default_value
         )
         assert all(isinstance(cp_value, bool) for cp_value in filter_cp_values)
 
