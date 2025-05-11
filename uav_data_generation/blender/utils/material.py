@@ -38,7 +38,7 @@ def group_and_filter_material_slots_by_cp(
             cp_values = cp_values.to_list()
 
         # check the length of cp_values == num_slots
-        num_slots = max(len(obj.blender_obj.material_slots), 1)
+        num_slots = len(mesh.blender_obj.material_slots)
         if isinstance(cp_values, list):
             assert len(cp_values) == num_slots
         else:
@@ -56,7 +56,7 @@ def group_and_filter_material_slots_by_cp(
     groups = defaultdict(list)
     for mesh in meshes:
         name = mesh.get_name()
-        num_slots = max(len(mesh.blender_obj.material_slots), 1)
+        num_slots = len(mesh.blender_obj.material_slots)
 
         # grouping by group_cp_name
         default_value = [f"{name}_{i}" for i in range(num_slots)]
