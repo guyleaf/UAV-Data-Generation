@@ -26,7 +26,13 @@ def group_and_filter_material_slots_by_cp(
     group_cp_name: str = "group_name",
     filter_cp_name: str = "material_randomization",
 ) -> dict[str, list[tuple[MeshObject, int]]]:
-    def get_cp_(obj: MeshObject, cp_name: str, default):
+    def get_cp_values(obj: MeshObject, cp_name: str, default):
+        """
+        Get a list of values from custom property
+            1. if the cp_name is not defined, use the default value.
+            2. if the cp_value is a single value, broadcast to every slot
+            3. if the cp_value is a list, use it directly.
+        """
         cp_values = get_cp(obj, cp_name, default=default)
         if isinstance(cp_values, idprop.types.IDPropertyArray):
             cp_values = cp_values.to_list()
@@ -39,26 +45,32 @@ def group_and_filter_material_slots_by_cp(
             cp_values = [cp_values] * num_slots
         return cp_values
 
+    # the first mesh is always the ancestor of all UAV meshes
+    uav_model = meshes[0]
+    default_filter_cp_value = get_cp(
+        uav_model, f"default_{filter_cp_name}", default=True
+    )
+    assert isinstance(default_filter_cp_value, bool)
+
+    # grouping by group_cp_name & filtering by filter_cp_name
     groups = defaultdict(list)
     for mesh in meshes:
         name = mesh.get_name()
         num_slots = max(len(mesh.blender_obj.material_slots), 1)
 
         # grouping by group_cp_name
-        # 1. if the cp is not defined, make every slot as an individual group
-        # 2. if the cp_value is a single value, broadcast to every slot
-        # 3. if the cp_value is a list, use it directly.
         default_value = [f"{name}_{i}" for i in range(num_slots)]
-        group_cp_values: list[str] = get_cp_(mesh, group_cp_name, default=default_value)
+        group_cp_values: list[str] = get_cp_values(
+            mesh, group_cp_name, default=default_value
+        )
+        assert all(isinstance(cp_value, str) for cp_value in group_cp_values)
 
         # filtering by filter_cp_name
-        # 1. if the cp is not defined, make every slot require randomization
-        # 2. if the cp_value is a single value, broadcast to every slot
-        # 3. if the cp_value is a list, use it directly.
-        default_value = [True] * num_slots
-        filter_cp_values: list[bool] = get_cp_(
+        default_value = [default_filter_cp_value] * num_slots
+        filter_cp_values: list[bool] = get_cp_values(
             mesh, filter_cp_name, default=default_value
         )
+        assert all(isinstance(cp_value, bool) for cp_value in filter_cp_values)
 
         for i, group_cp in filter(
             lambda item: filter_cp_values[item[0]], enumerate(group_cp_values)
