@@ -93,6 +93,12 @@ def generate_uav_samples(
     original_action_keys = bpy.data.actions.keys()
 
     for uav_components in uav_models:
+        # TODO: encapsulate UAV model as a class
+        # save UAV model status, e.g. material slots
+        original_materialss = [
+            uav_component.get_materials() for uav_component in uav_components
+        ]
+
         # show components of the current uav model
         for uav_component in uav_components:
             visibility = get_cp(uav_component, "visibility", default=True)
@@ -123,6 +129,15 @@ def generate_uav_samples(
         # hide current components for next rendering
         for uav_component in uav_components:
             uav_component.hide()
+
+        # restore UAV model status
+        for uav_component, original_materials in zip(
+            uav_components, original_materialss
+        ):
+            uav_component.clear_materials()
+            for i, original_material in enumerate(original_materials):
+                if original_material is not None:
+                    uav_component.set_material(i, original_material)
 
         # reset keyframes
         reset_keyframes(original_action_keys)
@@ -285,14 +300,14 @@ def generate_foregrounds(
     # collect image informations
     image_paths = collect_images(images_path)
     if checkpoint is not None:
-        assert (
-            checkpoint.image_paths == image_paths
-        ), "Inconsistent images. The checkpoint may be not for this."
+        assert checkpoint.image_paths == image_paths, (
+            "Inconsistent images. The checkpoint may be not for this."
+        )
         for image in coco_writer.images:
             image_path = os.path.join(fg_images_dir, image["file_name"])
-            assert os.path.exists(
-                image_path
-            ), f"The foreground image {image_path} is not Found."
+            assert os.path.exists(image_path), (
+                f"The foreground image {image_path} is not Found."
+            )
 
     uav_models = list(uav_models.values())
     start_index = checkpoint.image_index + 1 if checkpoint is not None else 0
