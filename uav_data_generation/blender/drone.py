@@ -35,14 +35,23 @@ def randomize_drone_properties(
 
     # 3. randomly apply a material for each group
     for material_slots in material_slots_groups.values():
-        material = random.choice(materials)
-        for mesh, i in material_slots:
-            if mesh.has_materials():
+        num_materials = len(materials)
+
+        # Consider the original material in the material slot
+        if any(
+            mesh.blender_obj.material_slots[i].material is not None
+            for mesh, i in material_slots
+        ):
+            assert all(
+                mesh.blender_obj.material_slots[i].material is not None
+                for mesh, i in material_slots
+            ), "Every material slot in the same group should have a material."
+            num_materials += 1
+
+        material_i = random.randrange(0, num_materials)
+        if material_i < len(materials):
+            material = materials[material_i]
+            for mesh, i in material_slots:
                 mesh.set_material(i, material)
-            else:
-                assert (
-                    i == 0
-                ), "The index of material slot must be 0 because there is no material slots in object."
-                mesh.add_material(material)
 
     return frame
