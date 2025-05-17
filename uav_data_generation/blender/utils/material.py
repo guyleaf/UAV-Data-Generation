@@ -62,17 +62,17 @@ def get_cp_list_for_material_slots(
 
 
 def group_and_filter_material_slots_by_cp(
-    entites: list[Entity],
+    entities: list[Entity],
     group_cp_name: str = "group_name",
     filter_cp_name: str = "material_randomization",
 ) -> dict[str, list[tuple[MeshObject, int]]]:
     # the first entity is always the ancestor
-    model = entites[0]
+    model = entities[0]
     default_filter_cp_value = get_cp(model, f"default_{filter_cp_name}", default=True)
     assert isinstance(default_filter_cp_value, bool)
 
     meshes: list[MeshObject] = bproc.filter.all_with_type(
-        entites, filtered_data_type=MeshObject
+        entities, filtered_data_type=MeshObject
     )
 
     # grouping by group_cp_name & filtering by filter_cp_name
