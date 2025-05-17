@@ -21,11 +21,9 @@
       "path": "../../archive"
     },
     {
-      "path": "../Weather_Effect_Generator"
+      "name": "PIH",
+      "path": "../PIH"
     },
-    {
-      "path": "../Depth-Anything"
-    }
   ],
   "settings": {
     "python.analysis.exclude": [
