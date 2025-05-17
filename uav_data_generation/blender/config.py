@@ -1,7 +1,7 @@
 import importlib.util
 import os
 from abc import ABC, abstractmethod
-from typing import Optional, Type
+from typing import Optional
 
 AREA_RANGES = tuple[tuple[int, int], tuple[int, int], tuple[int, int]]
 
@@ -47,7 +47,7 @@ class BaseConfig(ABC):
     # Align the camera with the UAV and move backward with the offset (m) (useful with motion blur).
     alignment_z_offset: float = 0
     # Increase the alignment distance with the step (m) (--adaptive-alignment only).
-    alignment_z_step: float = 1e-3
+    alignment_z_step: float = 1e-4
 
     # The maximum IoF among UAVs in image. (max_iof > 0 -> accept occlusion)
     # IoF (intersection over foreground) = overlap / bbox
@@ -89,8 +89,11 @@ class BaseConfig(ABC):
     # The interval for saving a checkpoint.
     checkpoint_interval: int = 5
 
+    skip_check: bool = False
+
     def __init__(self) -> None:
-        self.validate_args()
+        if not self.skip_check:
+            self.validate_args()
 
     def __repr__(self) -> str:
         # repr_str = f"Class name: '{self.__class__.__name__}' \n"
@@ -107,43 +110,73 @@ class BaseConfig(ABC):
         return list(attrs)
 
     @classmethod
-    def from_file(cls, path: str, class_name: str = "Config"):
+    def from_file(cls, path: str, class_name: str = "Config") -> "BaseConfig":
         spec = importlib.util.spec_from_file_location("cfg", path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
 
-        cfg: Type[cls] = getattr(module, class_name)
+        cfg = getattr(module, class_name)
         return cfg()
 
     def validate_args(self) -> None:
-        assert self.scene_path.endswith(
-            ".blend"
-        ), "The scene file should be a .blend file."
-        assert os.path.isdir(
-            os.path.expanduser(self.images_path)
-        ), "The images_path should be a folder path."
+        assert self.scene_path.endswith(".blend"), (
+            "The scene file should be a .blend file."
+        )
+        assert os.path.isdir(os.path.expanduser(self.images_path)), (
+            "The images_path should be a folder path."
+        )
 
         for range_ in [self.x_range, self.y_range, self.z_range]:
-            assert (
-                range_[0] <= range_[1]
-            ), f"The left of range should be less than or equal to the right, {range_}."
+            assert range_[0] <= range_[1], (
+                f"The left of range should be less than or equal to the right, {range_}."
+            )
 
-        assert (
-            0 <= self.sample_range[0] <= self.sample_range[1]
-        ), "Invalid sample range format."
-        assert (
-            len(self.area_ranges) == 3
-        ), "The area ranges should contain three ranges, small, medium, and large."
+        assert 0 <= self.sample_range[0] <= self.sample_range[1], (
+            "Invalid sample range format."
+        )
+        assert len(self.area_ranges) == 3, (
+            "The area ranges should contain three ranges, small, medium, and large."
+        )
         for area_range in self.area_ranges:
             assert 0 < area_range[0] < area_range[1], "Invalid area range format."
         for x, y in zip(self.area_ranges[:-1], self.area_ranges[1:]):
-            assert (
-                x[1] <= y[0]
-            ), "The start of area range should be larger or equal to previous end one."
+            assert x[1] <= y[0], (
+                "The start of area range should be larger or equal to previous end one."
+            )
         assert 0 <= self.max_iof <= 1, "The maximum IoF should be in (0, 1)."
 
     def to_dict(self):
         return {arg: getattr(self, arg) for arg in self._get_args()}
+
+
+class SceneConfig:
+    """
+    All the default config values are specified in this class.
+    """
+
+    # Scene
+    fps = 60
+
+    # Renderer
+    file_format = "PNG"
+    color_depth = 8
+    enable_transparency = True
+    jpg_quality = 95
+    sampling_noise_threshold = 0.01
+    denoiser = "OPENIMAGEDENOISE"
+    simplify_subdivision_render = 3
+
+    # Ligh Paths: use the default preset in blender 3.5.1
+    max_bounces = 12
+    diffuse_bounces = 4
+    glossy_bounces = 4
+    transmission_bounces = 12
+    volume_bounces = 0
+    transparency_bounces = 8
+
+    # Fast GI
+    use_fast_gi = False
+    ao_bounces_render = 3
 
 
 if __name__ == "__main__":

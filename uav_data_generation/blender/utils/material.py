@@ -1,4 +1,4 @@
-from typing import Any, Sequence, Union
+from typing import Any, MutableSequence, Union
 
 import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the top due to the check of blenderproc
 
@@ -6,6 +6,7 @@ from collections import defaultdict
 from operator import methodcaller
 
 import idprop
+from blenderproc.python.types.EntityUtility import Entity
 from blenderproc.python.types.MeshObjectUtility import MeshObject
 
 from .utils import get_cp
@@ -24,7 +25,7 @@ def collect_materials_by_cp(
 
 
 def get_cp_list_for_material_slots(
-    obj: MeshObject, cp_name: str, defaults: Union[Any, Sequence[Any]]
+    mesh: MeshObject, cp_name: str, defaults: Union[Any, MutableSequence[Any]]
 ):
     """
     Get a list of values from custom property
@@ -32,11 +33,12 @@ def get_cp_list_for_material_slots(
         2. if the cp_value is a single value, broadcast to every slot
         3. if the cp_value is a list, use it directly.
     """
-    num_slots = len(obj.blender_obj.material_slots)
-    if not isinstance(defaults, Sequence):
+    assert isinstance(mesh, MeshObject)
+    num_slots = len(mesh.blender_obj.material_slots)
+    if not isinstance(defaults, MutableSequence):
         defaults = [defaults] * num_slots
 
-    cp_list = get_cp(obj, cp_name, default=defaults)
+    cp_list = get_cp(mesh, cp_name, default=defaults)
     if isinstance(cp_list, idprop.types.IDPropertyArray):
         cp_list = cp_list.to_list()
     # workaround, support array of strings by using ',' delimiter
@@ -50,24 +52,28 @@ def get_cp_list_for_material_slots(
             ]
 
     # check the length of cp_values == num_slots
-    if isinstance(cp_list, Sequence):
-        assert len(cp_list) == num_slots
+    if isinstance(cp_list, MutableSequence):
+        assert len(cp_list) == num_slots, (
+            f"The length of cp_list should be equal to num_slots, {cp_list}."
+        )
     else:
         cp_list = [cp_list] * num_slots
     return list(cp_list)
 
 
 def group_and_filter_material_slots_by_cp(
-    meshes: list[MeshObject],
+    entities: list[Entity],
     group_cp_name: str = "group_name",
     filter_cp_name: str = "material_randomization",
 ) -> dict[str, list[tuple[MeshObject, int]]]:
-    # the first mesh is always the ancestor of all UAV meshes
-    uav_model = meshes[0]
-    default_filter_cp_value = get_cp(
-        uav_model, f"default_{filter_cp_name}", default=True
-    )
+    # the first entity is always the ancestor
+    model = entities[0]
+    default_filter_cp_value = get_cp(model, f"default_{filter_cp_name}", default=True)
     assert isinstance(default_filter_cp_value, bool)
+
+    meshes: list[MeshObject] = bproc.filter.all_with_type(
+        entities, filtered_data_type=MeshObject
+    )
 
     # grouping by group_cp_name & filtering by filter_cp_name
     groups = defaultdict(list)

@@ -1,19 +1,20 @@
 import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the top due to the check of blenderproc
 import bpy  # noqa: F401 # isort:skip
+
 import argparse
 import os
+import random
 from math import radians
 from typing import Optional
 
+from blenderproc.python.types.MeshObjectUtility import MeshObject
 from mathutils import Euler, Vector
 from matplotlib import font_manager
 from PIL import Image, ImageDraw, ImageFont
 
 from uav_data_generation.blender.camera import align_camera_pose
-from uav_data_generation.blender.drone import (
-    group_and_filter_material_slots_by_cp,
-    randomize_drone_properties,
-)
+from uav_data_generation.blender.config import BaseConfig
+from uav_data_generation.blender.drone import randomize_drone_properties
 from uav_data_generation.blender.setup import setup
 from uav_data_generation.blender.utils.bbox import find_bbox_xyxy_by_alpha
 from uav_data_generation.blender.utils.material import collect_materials_by_cp
@@ -22,80 +23,10 @@ from uav_data_generation.blender.utils.utils import get_cp, reset_keyframes
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        description="An demo script for material randomization powered by blender",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("scene_path", type=str, help="Path to the .blend scene file")
-    parser.add_argument(
-        "background_path",
-        type=str,
-        help="Path to the background HDRI file",
-    )
-    parser.add_argument(
-        "--x-range",
-        type=int,
-        nargs=2,
-        default=(-45, 45),
-        help="The angle range of x-axis in degree.",
-    )
-    parser.add_argument(
-        "--y-range",
-        type=int,
-        nargs=2,
-        default=(-45, 45),
-        help="The angle range of y-axis in degree.",
-    )
-    parser.add_argument(
-        "--z-range",
-        type=int,
-        nargs=2,
-        default=(0, 360),
-        help="The angle range of y-axis in degree.",
-    )
-    parser.add_argument(
-        "--adaptive-alignment",
-        default=True,
-        action=argparse.BooleanOptionalAction,
-        help="Enable adaptive alignment with the step (useful with motion blur)",
-    )
-    parser.add_argument(
-        "--alignment-z-offset",
-        type=float,
-        default=0,
-        help="Align the camera with the UAV and move backward with the offset (m) (useful with motion blur)",
-    )
-    parser.add_argument(
-        "--alignment-z-step",
-        type=float,
-        default=0.001,
-        help="Increase the alignment distance with the step (m) (--adaptive-alignment only)",
-    )
-
-    # render settings
-    parser.add_argument(
-        "--motion-blur",
-        default=True,
-        action=argparse.BooleanOptionalAction,
-        help="Enable motion blur or not",
-    )
-    parser.add_argument(
-        "--render-resolution",
-        nargs=2,
-        type=int,
-        default=(1920, 1920),
-        help="The original resolution of rendered UAV samples",
-    )
-    parser.add_argument(
-        "--render-max-samples",
-        type=int,
-        default=1024,
-        help="The maximum number of samples to render for each pixel",
-    )
-    parser.add_argument(
-        "--render-tile-size",
-        type=int,
-        default=2048,
-        help="The tile size for rendering a image (less -> slower & lower VRAM requirement, higher -> faster & higher VRAM requirement)",
-    )
+    parser.add_argument("config_path", type=str, help="Path to the config file")
 
     parser.add_argument(
         "--out-dir",
@@ -103,7 +34,13 @@ def parse_args():
         default="outputs",
         help="Path to where the final files, will be saved",
     )
-    parser.add_argument("--models", type=str, nargs="+", default=None)
+    parser.add_argument(
+        "--models",
+        type=str,
+        nargs="+",
+        default=None,
+        help="Override the models setting in the config file.",
+    )
     parser.add_argument(
         "--samples",
         default=60,
@@ -129,9 +66,8 @@ def parse_args():
         nargs="+",
         help="The GPU device ids for rendering. You can check the id by executing list_gpu_devices.py",
     )
-
     args = parser.parse_args()
-    assert args.scene_path.endswith(".blend") and os.path.isfile(args.scene_path)
+
     return args
 
 
@@ -151,7 +87,7 @@ def draw_bounding_box(image: Image.Image, coord: tuple[int, int, int, int]):
     draw.text(text_coord[:2], text=text, font=font, fill="white")
 
 
-def main(
+def demo_randomization(
     scene_path: str,
     background_path: str,
     models: Optional[list[str]] = None,
@@ -169,6 +105,7 @@ def main(
     samples: int = 3,
     device_type: str = "OPTIX",
     devices: list[int] = [0],
+    **kwargs,
 ):
     objs, uav_models = setup(
         scene_path,
@@ -179,11 +116,9 @@ def main(
         resolution=render_resolution,
         max_samples=render_max_samples,
         tile_size=render_tile_size,
+        models=models,
     )
     materials = collect_materials_by_cp()
-
-    if models is not None:
-        uav_models = {name: uav_models[name] for name in models}
 
     # place the camera in front of the UAV model
     camera = bpy.context.scene.camera
@@ -192,22 +127,33 @@ def main(
     bpy.context.view_layer.update()
 
     original_action_keys = bpy.data.actions.keys()
-    for i, (name, uav_components) in enumerate(uav_models.items()):
-        uav_model = uav_components[0]
+    for name, uav_entities in uav_models.items():
         print("\nUAV name:", name)
+        uav_meshes: list[MeshObject] = bproc.filter.all_with_type(
+            uav_entities, filtered_data_type=MeshObject
+        )
 
-        # show components of the current uav model
-        for uav_component in uav_components:
-            visibility = get_cp(uav_component, "visibility", default=True)
-            uav_component.hide(not visibility)
+        # show entities of the current uav model
+        for uav_entity in uav_entities:
+            visibility = get_cp(uav_entity, "visibility", default=True)
+            uav_entity.hide(not visibility)
+            uav_entity.blender_obj.hide_viewport = not visibility
 
-        # get material slots which require material_randomization
-        material_slots_groups = group_and_filter_material_slots_by_cp(uav_components)
+        # save UAV model status, e.g. material slots
+        original_material_slotss = [
+            [
+                material_slot.material
+                for material_slot in uav_mesh.blender_obj.material_slots
+            ]
+            for uav_mesh in uav_meshes
+        ]
 
         for i in range(samples):
-            frame = randomize_drone_properties(
-                uav_model,
-                material_slots_groups,
+            frame = random.randint(0, 249)
+
+            randomize_drone_properties(
+                frame,
+                uav_entities,
                 materials,
                 x_range=x_range,
                 y_range=y_range,
@@ -217,7 +163,7 @@ def main(
             # align the camera with the UAV
             z_offset = align_camera_pose(
                 frame,
-                uav_components,
+                uav_entities,
                 adaptive_alignment=adaptive_alignment,
                 alignment_z_offset=alignment_z_offset,
                 alignment_z_step=alignment_z_step,
@@ -225,29 +171,49 @@ def main(
 
             # render the whole pipeline
             bproc.utility.set_keyframe_render_interval(frame_start=frame)
-            data = bproc.renderer.render()
-            for j, color in enumerate(data["colors"]):
-                frame = bpy.context.scene.frame_start + j
-                image = Image.fromarray(color, mode="RGBA")
+            color = bproc.renderer.render()["colors"][0]
+            image = Image.fromarray(color, mode="RGBA")
 
-                # visualize with the bounding box
-                bbox = find_bbox_xyxy_by_alpha(color)
-                draw_bounding_box(image, bbox)
+            # visualize with the bounding box
+            bbox = find_bbox_xyxy_by_alpha(color)
+            draw_bounding_box(image, bbox)
 
-                # write the color to a .png container in the run-specific output directory
-                out_path = os.path.join(out_dir, name)
-                os.makedirs(out_path, exist_ok=True)
-                image.save(os.path.join(out_path, f"{i}_{frame}_{z_offset:.3f}m.png"))
+            # write the color to a .png container in the run-specific output directory
+            out_path = os.path.join(out_dir, name)
+            os.makedirs(out_path, exist_ok=True)
+            image.save(os.path.join(out_path, f"{i}_{frame}_{z_offset:.3f}m.png"))
 
             # reset keyframes
             reset_keyframes(original_action_keys)
 
-        # hide current components for next rendering
-        for uav_component in uav_components:
-            uav_component.hide()
+            # restore UAV model status
+            for uav_mesh, original_material_slots in zip(
+                uav_meshes, original_material_slotss
+            ):
+                for i, original_material_slot in enumerate(original_material_slots):
+                    uav_mesh.blender_obj.material_slots[
+                        i
+                    ].material = original_material_slot
+
+        # hide current entities for next rendering
+        for uav_entity in uav_entities:
+            uav_entity.hide()
+            uav_entity.blender_obj.hide_viewport = True
 
 
 if __name__ == "__main__":
     args = vars(parse_args())
+    cfg = BaseConfig.from_file(args.pop("config_path"))
+
+    print()
+    print("Arguments:", args)
+
+    models = args.pop("models")
+    if models is not None:
+        cfg.models = models
+    cfg.out_dir = os.path.expanduser(args.pop("out_dir"))
+
+    print(cfg)
+
     os.environ["BLENDER_PROC_RANDOM_SEED"] = str(args.pop("seed"))
-    main(args.pop("scene_path"), args.pop("background_path"), **args)
+    demo_randomization(**cfg.to_dict(), **args)

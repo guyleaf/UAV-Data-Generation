@@ -3,6 +3,7 @@ from types import TracebackType
 from typing import Optional, Type
 
 import bpy
+from blenderproc.python.utility.Utility import KeyFrame
 
 
 class _FrameState(threading.local):
@@ -36,6 +37,9 @@ class Frame:
         self._prev_subframe = 0
 
     def __enter__(self):
+        assert not KeyFrame.is_any_active(), (
+            "You cannot use Frame and KeyFrame at the same time."
+        )
         Frame.state.depth += 1
         if self._frame is not None:
             self._prev_frame = bpy.context.scene.frame_current

@@ -9,6 +9,7 @@ from operator import itemgetter
 from typing import Optional
 
 import PIL.Image as Image
+from blenderproc.python.types.EntityUtility import Entity
 from blenderproc.python.types.MaterialUtility import Material
 from blenderproc.python.types.MeshObjectUtility import MeshObject
 from mathutils import Euler, Vector
@@ -80,7 +81,7 @@ def parse_args():
 
 
 def generate_uav_samples(
-    uav_models: list[list[MeshObject]],
+    uav_models: list[list[Entity]],
     materials: list[Material],
     x_range: tuple[int, int] = (-45, 45),
     y_range: tuple[int, int] = (-45, 45),
@@ -92,15 +93,34 @@ def generate_uav_samples(
     # cache the original state of animtations
     original_action_keys = bpy.data.actions.keys()
 
-    for uav_components in uav_models:
-        # show components of the current uav model
-        for uav_component in uav_components:
-            visibility = get_cp(uav_component, "visibility", default=True)
-            uav_component.hide(not visibility)
+    for uav_entities in uav_models:
+        uav_meshes: list[MeshObject] = bproc.filter.all_with_type(
+            uav_entities, filtered_data_type=MeshObject
+        )
+
+        # show entities of the current uav model
+        for uav_entity in uav_entities:
+            visibility = get_cp(uav_entity, "visibility", default=True)
+            uav_entity.hide(not visibility)
+            uav_entity.blender_obj.hide_viewport = not visibility
+
+        # TODO: encapsulate UAV model as a class
+        # TODO: validate UAV model configurations
+        # save UAV model status, e.g. material slots
+        original_material_slotss = [
+            [
+                material_slot.material
+                for material_slot in uav_mesh.blender_obj.material_slots
+            ]
+            for uav_mesh in uav_meshes
+        ]
+
+        frame = random.randint(0, 249)
 
         # randomize the material and rotation
-        frame = randomize_drone_properties(
-            uav_components,
+        randomize_drone_properties(
+            frame,
+            uav_entities,
             materials,
             x_range=x_range,
             y_range=y_range,
@@ -110,7 +130,7 @@ def generate_uav_samples(
         # align the camera with the UAV
         align_camera_pose(
             frame,
-            uav_components,
+            uav_entities,
             adaptive_alignment=adaptive_alignment,
             alignment_z_offset=alignment_z_offset,
             alignment_z_step=alignment_z_step,
@@ -120,9 +140,17 @@ def generate_uav_samples(
         bproc.utility.set_keyframe_render_interval(frame_start=frame)
         image = bproc.renderer.render()["colors"][0]
 
-        # hide current components for next rendering
-        for uav_component in uav_components:
-            uav_component.hide()
+        # restore UAV model status
+        for uav_mesh, original_material_slots in zip(
+            uav_meshes, original_material_slotss
+        ):
+            for i, original_material_slot in enumerate(original_material_slots):
+                uav_mesh.blender_obj.material_slots[i].material = original_material_slot
+
+        # hide current entities for next rendering
+        for uav_entity in uav_entities:
+            uav_entity.hide()
+            uav_entity.blender_obj.hide_viewport = True
 
         # reset keyframes
         reset_keyframes(original_action_keys)
@@ -248,6 +276,7 @@ def generate_foregrounds(
     checkpoint: Optional[Checkpoint] = None,
     max_checkpoints: int = 3,
     checkpoint_interval: int = 5,
+    **kwargs,
 ):
     objs, uav_models = setup(
         scene_path,
@@ -258,11 +287,9 @@ def generate_foregrounds(
         resolution=render_resolution,
         max_samples=render_max_samples,
         tile_size=render_tile_size,
+        models=models,
     )
     materials = collect_materials_by_cp()
-
-    if models is not None:
-        uav_models = {name: uav_models[name] for name in models}
 
     # place the camera in front of the UAV model
     camera = bpy.context.scene.camera
@@ -285,14 +312,14 @@ def generate_foregrounds(
     # collect image informations
     image_paths = collect_images(images_path)
     if checkpoint is not None:
-        assert (
-            checkpoint.image_paths == image_paths
-        ), "Inconsistent images. The checkpoint may be not for this."
+        assert checkpoint.image_paths == image_paths, (
+            "Inconsistent images. The checkpoint may be not for this."
+        )
         for image in coco_writer.images:
             image_path = os.path.join(fg_images_dir, image["file_name"])
-            assert os.path.exists(
-                image_path
-            ), f"The foreground image {image_path} is not Found."
+            assert os.path.exists(image_path), (
+                f"The foreground image {image_path} is not Found."
+            )
 
     uav_models = list(uav_models.values())
     start_index = checkpoint.image_index + 1 if checkpoint is not None else 0
