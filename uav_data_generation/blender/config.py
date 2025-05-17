@@ -1,7 +1,7 @@
 import importlib.util
 import os
 from abc import ABC, abstractmethod
-from typing import Optional, Type
+from typing import Optional
 
 AREA_RANGES = tuple[tuple[int, int], tuple[int, int], tuple[int, int]]
 
@@ -89,8 +89,11 @@ class BaseConfig(ABC):
     # The interval for saving a checkpoint.
     checkpoint_interval: int = 5
 
+    skip_check: bool = False
+
     def __init__(self) -> None:
-        self.validate_args()
+        if not self.skip_check:
+            self.validate_args()
 
     def __repr__(self) -> str:
         # repr_str = f"Class name: '{self.__class__.__name__}' \n"
@@ -107,39 +110,39 @@ class BaseConfig(ABC):
         return list(attrs)
 
     @classmethod
-    def from_file(cls, path: str, class_name: str = "Config"):
+    def from_file(cls, path: str, class_name: str = "Config") -> "BaseConfig":
         spec = importlib.util.spec_from_file_location("cfg", path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
 
-        cfg: Type[cls] = getattr(module, class_name)
+        cfg = getattr(module, class_name)
         return cfg()
 
     def validate_args(self) -> None:
-        assert self.scene_path.endswith(
-            ".blend"
-        ), "The scene file should be a .blend file."
-        assert os.path.isdir(
-            os.path.expanduser(self.images_path)
-        ), "The images_path should be a folder path."
+        assert self.scene_path.endswith(".blend"), (
+            "The scene file should be a .blend file."
+        )
+        assert os.path.isdir(os.path.expanduser(self.images_path)), (
+            "The images_path should be a folder path."
+        )
 
         for range_ in [self.x_range, self.y_range, self.z_range]:
-            assert (
-                range_[0] <= range_[1]
-            ), f"The left of range should be less than or equal to the right, {range_}."
+            assert range_[0] <= range_[1], (
+                f"The left of range should be less than or equal to the right, {range_}."
+            )
 
-        assert (
-            0 <= self.sample_range[0] <= self.sample_range[1]
-        ), "Invalid sample range format."
-        assert (
-            len(self.area_ranges) == 3
-        ), "The area ranges should contain three ranges, small, medium, and large."
+        assert 0 <= self.sample_range[0] <= self.sample_range[1], (
+            "Invalid sample range format."
+        )
+        assert len(self.area_ranges) == 3, (
+            "The area ranges should contain three ranges, small, medium, and large."
+        )
         for area_range in self.area_ranges:
             assert 0 < area_range[0] < area_range[1], "Invalid area range format."
         for x, y in zip(self.area_ranges[:-1], self.area_ranges[1:]):
-            assert (
-                x[1] <= y[0]
-            ), "The start of area range should be larger or equal to previous end one."
+            assert x[1] <= y[0], (
+                "The start of area range should be larger or equal to previous end one."
+            )
         assert 0 <= self.max_iof <= 1, "The maximum IoF should be in (0, 1)."
 
     def to_dict(self):

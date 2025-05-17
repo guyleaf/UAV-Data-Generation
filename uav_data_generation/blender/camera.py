@@ -2,6 +2,7 @@ import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the to
 
 import bpy  # noqa: F401 # isort:skip
 
+from blenderproc.python.types.EntityUtility import Entity
 from blenderproc.python.types.MeshObjectUtility import MeshObject
 
 from .frame import Frame
@@ -12,15 +13,15 @@ from .utils.utils import select_objects
 
 def align_camera_pose(
     frame: int,
-    uav_components: list[MeshObject],
+    entities: list[Entity],
     adaptive_alignment: bool = True,
     alignment_z_offset: float = 0,
     alignment_z_step: float = 0.1,
 ):
     camera = bpy.context.scene.camera
 
-    # select current UAV model
-    select_objects(uav_components)
+    # select the current model
+    select_objects(entities)
 
     # including the animation
     with Frame(frame):
@@ -43,7 +44,10 @@ def align_camera_pose(
             frames += [(frame - 1, 1 - half_shutter), (frame, half_shutter)]
 
         # check if all vertices of UAV are in the camera
-        while not are_all_meshes_in_camera_view(uav_components, frames):
+        uav_meshes: list[MeshObject] = bproc.filter.all_with_type(
+            entities, filtered_data_type=MeshObject
+        )
+        while not are_all_meshes_in_camera_view(uav_meshes, frames):
             z_offset += alignment_z_step
             translate_axis(camera, "Z", alignment_z_step)
         print(f"[Adaptive alignment] Retrying to move backward... {z_offset:.3f}m")

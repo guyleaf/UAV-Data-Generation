@@ -20,6 +20,7 @@ def translate_axis(obj: Union[Entity, bpy.types.Object], axis: str, amount: floa
     if isinstance(obj, Entity):
         obj = obj.blender_obj
 
+    # calculate local vector for translation
     axis_vector = Vector(AXIS[axis.upper()])
     axis_vector *= amount
 

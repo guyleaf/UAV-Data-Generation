@@ -1,10 +1,12 @@
+from typing import Optional
+
 import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the top due to the check of blenderproc
 
 import os
 from operator import methodcaller
 
 import bpy
-from blenderproc.api.types import Entity, MeshObject
+from blenderproc.api.types import Entity
 
 
 def setup(
@@ -16,6 +18,7 @@ def setup(
     resolution: tuple[int, int] = (1920, 1920),
     max_samples: int = 1024,
     tile_size: int = 1024,
+    models: Optional[list[str]] = None,
 ):
     bproc.init()
 
@@ -40,9 +43,11 @@ def setup(
     # note: only objects in the obj_types can be loaded
     # otherwise, such as scene settings, they aren't loaded by blenderprc
     objs = bproc.loader.load_blend(
-        scene_path, obj_types=["mesh", "light"], data_blocks=["objects", "materials"]
+        scene_path,
+        obj_types=["mesh", "light", "empty"],
+        data_blocks=["objects", "materials"],
     )
-    objs: list[Entity] = bproc.filter.all_with_type(objs, filtered_data_type=Entity)
+    entites: list[Entity] = bproc.filter.all_with_type(objs, filtered_data_type=Entity)
 
     # Setup scene settingss
     bpy.context.scene.render.fps = 60
@@ -57,24 +62,26 @@ def setup(
         bproc.renderer.enable_motion_blur(motion_blur_length=0.5)
 
     # collect UAV models by custom property
-    uav_objs: list[MeshObject] = bproc.filter.by_cp(
-        objs, "UAV_model", True, filtered_data_type=MeshObject
-    )
-    uav_objs.sort(key=methodcaller("get_name"))
+    uav_models: list[Entity] = bproc.filter.by_cp(entites, "UAV_model", True)
+    uav_models.sort(key=methodcaller("get_name"))
 
-    # organize components for each uav model as dict
-    uav_models: dict[str, list[MeshObject]] = {}
-    for obj in uav_objs:
-        uav_name = obj.get_name()
-        uav_models[uav_name] = [obj] + sorted(
-            obj.get_children(return_all_offspring=True), key=methodcaller("get_name")
+    # organize entites for each uav model as dict
+    uav_model_dict: dict[str, list[Entity]] = {}
+    for model in uav_models:
+        uav_name = model.get_name()
+        uav_model_dict[uav_name] = [model] + sorted(
+            model.get_children(return_all_offspring=True), key=methodcaller("get_name")
         )
 
-    assert len(uav_models) > 0, "UAV model is not found."
-    print("\nFind", len(uav_models), "UAV models")
+    if models is not None:
+        uav_model_dict = {name: uav_model_dict[name] for name in models}
+
+    assert len(uav_model_dict) > 0, "UAV model is not found."
+    print("\nFind", len(uav_model_dict), "UAV models")
 
     # hide all objects by default
-    for obj in objs:
-        obj.hide()
+    for model in entites:
+        model.hide()
+        model.blender_obj.hide_viewport = True
 
-    return objs, uav_models
+    return entites, uav_model_dict
