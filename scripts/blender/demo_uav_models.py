@@ -1,4 +1,4 @@
-import blenderproc as bproc  # isort:skip, this should be at the top due to the check of blenderproc
+import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the top due to the check of blenderproc
 
 import argparse
 import os
@@ -121,22 +121,22 @@ def demo_uav_models(
     camera = bpy.context.scene.camera
 
     original_action_keys = bpy.data.actions.keys()
-    for i, (name, uav_entites) in enumerate(uav_models.items()):
+    for name, uav_entities in uav_models.items():
         print("\nUAV name:", name)
         uav_meshes: list[MeshObject] = bproc.filter.all_with_type(
-            uav_entites, filtered_data_type=MeshObject
+            uav_entities, filtered_data_type=MeshObject
         )
 
-        # show entites of the current uav model
-        for uav_entity in uav_entites:
+        # show entities of the current uav model
+        for uav_entity in uav_entities:
             visibility = get_cp(uav_entity, "visibility", default=True)
             uav_entity.hide(not visibility)
             uav_entity.blender_obj.hide_viewport = not visibility
 
-        select_objects(uav_entites)
+        select_objects(uav_entities)
 
         # randomize the material and rotation
-        randomize_drone_materials(uav_entites, materials)
+        randomize_drone_materials(uav_entities, materials)
 
         # find point of interest, all cam poses should look towards it
         poi, min_poi, max_poi = compute_poi(uav_meshes)
@@ -177,8 +177,8 @@ def demo_uav_models(
             # reset keyframes
             reset_keyframes(original_action_keys)
 
-        # hide current entites for next rendering
-        for uav_entity in uav_entites:
+        # hide current entities for next rendering
+        for uav_entity in uav_entities:
             uav_entity.hide()
             uav_entity.blender_obj.hide_viewport = True
 
