@@ -1,7 +1,7 @@
 import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the top due to the check of blenderproc
-
 import random
 
+import bpy
 from blenderproc.python.types.EntityUtility import Entity
 from blenderproc.python.types.MaterialUtility import Material
 
@@ -11,28 +11,30 @@ from .utils.material import group_and_filter_material_slots_by_cp
 
 def randomize_drone_geometry(
     frame: int,
-    entites: list[Entity],
+    entities: list[Entity],
     x_range: tuple[int, int] = (-45, 45),
     y_range: tuple[int, int] = (-45, 45),
     z_range: tuple[int, int] = (0, 360),
 ):
     # the first entity is always the ancestor
-    model = entites[0]
+    model = entities[0]
 
     # randomly sample an euler angle
     euler = rand_rotation_euler(x_range, y_range, z_range)
     model.set_rotation_euler(euler, frame=frame)
 
+    bpy.context.view_layer.update()
+
 
 def randomize_drone_materials(
-    entites: list[Entity],
+    entities: list[Entity],
     materials: list[Material],
     group_cp_name: str = "group_name",
     filter_cp_name: str = "material_randomization",
 ):
     # get material slots which require material_randomization
     material_slots_groups = group_and_filter_material_slots_by_cp(
-        entites, group_cp_name=group_cp_name, filter_cp_name=filter_cp_name
+        entities, group_cp_name=group_cp_name, filter_cp_name=filter_cp_name
     )
 
     # randomly apply a material for each group
@@ -58,28 +60,24 @@ def randomize_drone_materials(
 
 
 def randomize_drone_properties(
-    entites: list[Entity],
+    frame: int,
+    entities: list[Entity],
     materials: list[Material],
     x_range: tuple[int, int] = (-45, 45),
     y_range: tuple[int, int] = (-45, 45),
     z_range: tuple[int, int] = (0, 360),
     group_cp_name: str = "group_name",
     filter_cp_name: str = "material_randomization",
-) -> int:
-    # 1. randomly sample a frame for animation
-    frame = random.randint(0, 249)
-
-    # 2. sample an euler angle
+):
+    # sample an euler angle
     randomize_drone_geometry(
-        frame, entites, x_range=x_range, y_range=y_range, z_range=z_range
+        frame, entities, x_range=x_range, y_range=y_range, z_range=z_range
     )
 
-    # 3. material randomization
+    # material randomization
     randomize_drone_materials(
-        entites,
+        entities,
         materials,
         group_cp_name=group_cp_name,
         filter_cp_name=filter_cp_name,
     )
-
-    return frame
