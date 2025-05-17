@@ -47,7 +47,7 @@ class BaseConfig(ABC):
     # Align the camera with the UAV and move backward with the offset (m) (useful with motion blur).
     alignment_z_offset: float = 0
     # Increase the alignment distance with the step (m) (--adaptive-alignment only).
-    alignment_z_step: float = 1e-3
+    alignment_z_step: float = 1e-4
 
     # The maximum IoF among UAVs in image. (max_iof > 0 -> accept occlusion)
     # IoF (intersection over foreground) = overlap / bbox
@@ -147,6 +147,36 @@ class BaseConfig(ABC):
 
     def to_dict(self):
         return {arg: getattr(self, arg) for arg in self._get_args()}
+
+
+class SceneConfig:
+    """
+    All the default config values are specified in this class.
+    """
+
+    # Scene
+    fps = 60
+
+    # Renderer
+    file_format = "PNG"
+    color_depth = 8
+    enable_transparency = True
+    jpg_quality = 95
+    sampling_noise_threshold = 0.01
+    denoiser = "OPENIMAGEDENOISE"
+    simplify_subdivision_render = 3
+
+    # Ligh Paths: use the default preset in blender 3.5.1
+    max_bounces = 12
+    diffuse_bounces = 4
+    glossy_bounces = 4
+    transmission_bounces = 12
+    volume_bounces = 0
+    transparency_bounces = 8
+
+    # Fast GI
+    use_fast_gi = False
+    ao_bounces_render = 3
 
 
 if __name__ == "__main__":
