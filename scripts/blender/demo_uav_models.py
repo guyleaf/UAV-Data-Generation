@@ -6,29 +6,42 @@ from typing import Optional
 
 import bpy
 import numpy as np
+from blenderproc.python.types.MeshObjectUtility import MeshObject
 from mathutils import Matrix, Vector
 
+from uav_data_generation.blender.config import BaseConfig
+from uav_data_generation.blender.drone import randomize_drone_materials
 from uav_data_generation.blender.setup import setup
-from uav_data_generation.blender.utils.utils import get_cp, reset_keyframes
+from uav_data_generation.blender.utils.geometry import translate_axis
+from uav_data_generation.blender.utils.material import collect_materials_by_cp
+from uav_data_generation.blender.utils.mesh import compute_poi
+from uav_data_generation.blender.utils.utils import (
+    get_cp,
+    reset_keyframes,
+    select_objects,
+)
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        description="An demo script for UAV models powered by blender",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("scene_path", type=str, help="Path to the .blend scene file")
+    parser.add_argument("config_path", type=str, help="Path to the config file")
+
     parser.add_argument(
-        "background_path",
-        type=str,
-        help="Path to the background HDRI file",
-    )
-    parser.add_argument(
-        "--out_dir",
+        "--out-dir",
         type=str,
         default="outputs",
-        help="Path to where the final files, will be saved",
+        help="Path to where the final files, will be saved.",
     )
-    parser.add_argument("--models", type=str, nargs="+", default=None)
+    parser.add_argument(
+        "--models",
+        type=str,
+        nargs="+",
+        default=None,
+        help="Override the models setting in the config file.",
+    )
     parser.add_argument(
         "--samples",
         default=60,
@@ -42,7 +55,7 @@ def parse_args():
         help="The seed for random sampling.",
     )
     parser.add_argument(
-        "--device_type",
+        "--device-type",
         default="OPTIX",
         type=str,
         help="The GPU device type for rendering. Possible choices are [CPU, OPTIX, CUDA, METAL, HIP]",
@@ -54,139 +67,135 @@ def parse_args():
         nargs="+",
         help="The GPU device ids for rendering. You can check the id by executing list_gpu_devices.py",
     )
-
     args = parser.parse_args()
-    assert args.scene_path.endswith(".blend") and os.path.isfile(args.scene_path)
+
     return args
+
+
+def calculate_matrix_world_from_poi(
+    poi: np.ndarray, radius: float, frame: int, samples: int, z_offset: float = 0.3
+):
+    location_cam = np.array(
+        [
+            radius * np.cos(frame / samples * np.pi * 2),
+            radius * np.sin(frame / samples * np.pi * 2),
+            poi[-1] + z_offset,
+        ]
+    )
+    # compute rotation based on vector going from location towards poi + drift
+    rotation_matrix = bproc.camera.rotation_from_forward_vec(poi - location_cam)
+    # add homog cam pose based on location and rotation
+    cam2world_matrix = Matrix(
+        bproc.math.build_transformation_mat(location_cam, rotation_matrix)
+    )
+    return cam2world_matrix
 
 
 def demo_uav_models(
     scene_path: str,
     background_path: str,
     models: Optional[list[str]] = None,
+    alignment_z_offset: float = 0,
+    motion_blur: bool = True,
+    render_resolution: tuple[int, int] = (1920, 1920),
+    render_max_samples: int = 1024,
+    render_tile_size: int = 1024,
+    samples: int = 60,
     out_dir: str = "outputs",
-    samples: int = 3,
     device_type: str = "OPTIX",
     devices: list[int] = [0],
+    **kwargs,
 ):
-    objs, uav_models = setup(scene_path, background_path, device_type, devices)
-
-    # hide all uav components and set categorid_id to 0 as drone category
-    for uav_components in uav_models.values():
-        for uav_component in uav_components:
-            uav_component.set_cp("category_id", 1)
-            uav_component.hide()
-
-    if models is not None:
-        uav_models = {name: uav_models[name] for name in models}
+    objs, uav_models = setup(
+        scene_path,
+        background_path,
+        device_type,
+        devices,
+        motion_blur=motion_blur,
+        resolution=render_resolution,
+        max_samples=render_max_samples,
+        tile_size=render_tile_size,
+        models=models,
+    )
+    materials = collect_materials_by_cp()
+    camera = bpy.context.scene.camera
 
     original_action_keys = bpy.data.actions.keys()
-    for i, (name, uav_components) in enumerate(uav_models.items()):
+    for i, (name, uav_entites) in enumerate(uav_models.items()):
         print("\nUAV name:", name)
+        uav_meshes: list[MeshObject] = bproc.filter.all_with_type(
+            uav_entites, filtered_data_type=MeshObject
+        )
 
-        # show components of the current uav model
-        for uav_component in uav_components:
-            visibility = get_cp(uav_component, "visibility", default=True)
-            uav_component.hide(not visibility)
+        # show entites of the current uav model
+        for uav_entity in uav_entites:
+            visibility = get_cp(uav_entity, "visibility", default=True)
+            uav_entity.hide(not visibility)
+            uav_entity.blender_obj.hide_viewport = not visibility
+
+        select_objects(uav_entites)
+
+        # randomize the material and rotation
+        randomize_drone_materials(uav_entites, materials)
 
         # find point of interest, all cam poses should look towards it
-        poi = bproc.object.compute_poi(uav_components)
+        poi, min_poi, max_poi = compute_poi(uav_meshes)
 
-        # add translational random walk on top of the POI
-        # poi_drift = bproc.sampler.random_walk(
-        #     total_length=samples,
-        #     dims=3,
-        #     step_magnitude=0.005,
-        #     window_size=5,
-        #     interval=[-0.03, 0.03],
-        #     distribution="uniform",
-        # )
-
-        # select current UAV model
-        bpy.ops.object.select_all(action="DESELECT")
-        uav_model = uav_components[0]
-        bpy.context.view_layer.objects.active = uav_model.blender_obj
-        uav_model.select()
-        bpy.ops.object.select_hierarchy(direction="CHILD", extend=True)
-
-        for frame in range(samples):
-            # set the current frame in order to get the correct animtation to let the camera fit the object
-            bpy.context.scene.frame_set(frame)
-
-            # 1. determine the location of camera
-            # camera trajectory that defines a quater circle at constant height
-            location_cam = np.array(
-                [
-                    1 * np.cos(frame / samples * np.pi * 2),
-                    1 * np.sin(frame / samples * np.pi * 2),
-                    0,
-                ]
+        for z in [max_poi[2] + 0.2, min_poi[2] - 0.2]:
+            z_offset = z - poi[2]
+            # confirm the distance between the camera and the model
+            bpy.context.scene.frame_set(0)
+            camera.matrix_world = calculate_matrix_world_from_poi(
+                poi, 1, 0, samples, z_offset=z_offset
             )
-            # compute rotation based on vector going from location towards poi + drift
-            # rotation_matrix = bproc.camera.rotation_from_forward_vec(
-            #     poi + poi_drift[frame] - location_cam
-            # )
-            rotation_matrix = bproc.camera.rotation_from_forward_vec(poi - location_cam)
-            # add homog cam pose based on location and rotation
-            cam2world_matrix = bproc.math.build_transformation_mat(
-                location_cam, rotation_matrix
-            )
-
-            # 2. align the camera view to fit UAV
-            camera = bpy.context.scene.camera
-            camera.matrix_world = Matrix(cam2world_matrix)
             bpy.ops.view3d.camera_to_view_selected()
+            radius = (camera.location - Vector(poi)).magnitude
 
-            # 3. move the camera -0.1m along local Z-axis (0, 0, 1)
-            move_amount = 0.05
+            for frame in range(samples):
+                bpy.context.scene.frame_set(frame)
 
-            # by default, the camera view direction is local -Z axis in blender.
-            # so, we just take the local Z-axis. (move backward)
-            backward_vector = Vector((0, 0, move_amount))
+                # align the camera view to the model
+                camera.matrix_world = calculate_matrix_world_from_poi(
+                    poi, radius, frame, samples, z_offset=z_offset
+                )
+                translate_axis(camera, "Z", alignment_z_offset)
+                bproc.camera.add_camera_pose(camera.matrix_world, frame=frame)
 
-            # transform local vector to global vector by rotation matrix (ignore scale)
-            backward_vector = camera.rotation_euler.to_matrix() @ backward_vector
+            # render the whole pipeline
+            data = bproc.renderer.render()
 
-            # translate location
-            # it is equivalent to `camera.location += backward_vector; bpy.context.view_layer.update(); cam2world_matrix = camera.matrix_world`
-            cam2world_matrix = Matrix.Translation(backward_vector) @ camera.matrix_world
+            # write the data to a .hdf5 container in the run-specific output directory
+            bproc.writer.write_gif_animation(
+                os.path.join(out_dir, name),
+                data,
+                frame_duration_in_ms=300,
+                # frame_duration_in_ms=round(1000 / bpy.context.scene.render.fps),
+                append_to_existing_output=True,
+            )
+            # bproc.writer.write_hdf5(os.path.join(out_dir, name), data)
 
-            bproc.camera.add_camera_pose(cam2world_matrix, frame=frame)
+            # reset keyframes
+            reset_keyframes(original_action_keys)
 
-        # activate segment rendering
-        bproc.renderer.enable_segmentation_output(
-            map_by="category_id", default_values=dict(category_id=0)
-        )
-
-        # render the whole pipeline
-        data = bproc.renderer.render()
-
-        # write the data to a .hdf5 container in the run-specific output directory
-        bproc.writer.write_gif_animation(
-            os.path.join(out_dir, name),
-            data,
-            frame_duration_in_ms=round(1000 / bpy.context.scene.render.fps),
-            append_to_existing_output=True,
-        )
-        # bproc.writer.write_hdf5(os.path.join(out_dir, name), data)
-
-        # hide current components for next rendering
-        for uav_component in uav_components:
-            uav_component.hide()
-
-        # reset keyframes
-        reset_keyframes(original_action_keys)
+        # hide current entites for next rendering
+        for uav_entity in uav_entites:
+            uav_entity.hide()
+            uav_entity.blender_obj.hide_viewport = True
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    os.environ["BLENDER_PROC_RANDOM_SEED"] = str(args.seed)
-    demo_uav_models(
-        args.scene_path,
-        args.background_path,
-        models=args.models,
-        out_dir=args.out_dir,
-        samples=args.samples,
-        device_type=args.device_type,
-        devices=args.devices,
-    )
+    args = vars(parse_args())
+    cfg = BaseConfig.from_file(args.pop("config_path"))
+
+    print()
+    print("Arguments:", args)
+
+    models = args.pop("models")
+    if models is not None:
+        cfg.models = models
+    cfg.out_dir = os.path.expanduser(args.pop("out_dir"))
+
+    print(cfg)
+
+    os.environ["BLENDER_PROC_RANDOM_SEED"] = str(args.pop("seed"))
+    demo_uav_models(**cfg.to_dict(), **args)
