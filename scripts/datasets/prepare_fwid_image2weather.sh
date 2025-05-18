@@ -31,7 +31,4 @@ python "$(dirname "$0")/clean_classification_datasets.py" "$root/FWID/dataset" -
 
 cp -r "$root/Image2Weather/dataset" "$out/Image2Weather"
 cp -r "$root/FWID/dataset" "$out/FWID"
-python "$(dirname "$0")scripts/datasets/clean_classification_datasets.py" "$out/Image2Weather" "$out/FWID" --duplicated-dir "$out/duplicates"
-
-# for weather stylization evaluation
-python "$(dirname "$0")/combine_classification_datasets.py" "$out/Image2Weather" "$out/FWID" "$out/combined" --all-in-one
+python "$(dirname "$0")/clean_classification_datasets.py" "$out/Image2Weather" "$out/FWID" --duplicated-dir "$out/duplicates"
