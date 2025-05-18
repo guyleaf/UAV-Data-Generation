@@ -1,7 +1,5 @@
 import os
 
-import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the top due to the check of blenderproc
-
 from rich import print
 
 from uav_data_generation.blender.config import AREA_RANGES, BaseConfig
@@ -10,14 +8,12 @@ from uav_data_generation.blender.config import AREA_RANGES, BaseConfig
 class Config(BaseConfig):
     @property
     def scene_path(self) -> str:
-        return os.path.expanduser(
-            "<the folder contains blender scene and assets>/UAVs.blend"
-        )
+        return os.path.expanduser("~/data/UAV/blender/UAVs.blend")
 
     @property
     def background_path(self) -> str:
         return os.path.expanduser(
-            "<the folder contains blender scene and assets>/assets/backgrounds/studiolights/city.exr"
+            "~/data/UAV/blender/assets/backgrounds/studiolights/city.exr"
         )
 
     x_range: tuple[int, int] = (-30, 30)
@@ -30,10 +26,9 @@ class Config(BaseConfig):
         (96**2, 100000**2),
     )
 
-    # faster prototyping
-    render_max_samples: int = 128
+    render_max_samples: int = 512
 
-    out_dir: str = os.path.expanduser("<the folder contains UAV datasets>/Weather_Anti_UAV_T")
+    out_dir: str = os.path.expanduser("~/data/UAV/Robust_Anti_UAV_S")
 
 
 if __name__ == "__main__":
