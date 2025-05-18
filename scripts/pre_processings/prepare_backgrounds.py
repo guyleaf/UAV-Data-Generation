@@ -53,15 +53,8 @@ def parse_args():
         "--labels",
         type=str,
         nargs="*",
-        default=["clear", "cloudy", "foggy", "rainy", "snowy"],
-        help="collect background images from labels",
-    )
-    parser.add_argument(
-        "--filling-labels",
-        type=str,
-        nargs="*",
         default=["clear", "cloudy"],
-        help="fill the missing samples from labels",
+        help="collect background images from labels",
     )
     parser.add_argument(
         "--max-resolution",
@@ -69,12 +62,6 @@ def parse_args():
         nargs=2,
         default=(1920, 1920),
         help="maximum resolution of background images, (width, height)",
-    )
-    parser.add_argument(
-        "--fake-only",
-        default=False,
-        action=argparse.BooleanOptionalAction,
-        help="ignore the labels (filling labels exclusive) and fill the missing samples from filling labels",
     )
 
     parser.add_argument(
@@ -88,20 +75,20 @@ def parse_args():
     )
     args = parser.parse_args()
 
-    assert all(
-        os.path.isdir(root_dir) for root_dir in args.root_dirs
-    ), "Not all root folders exists."
+    assert all(os.path.isdir(root_dir) for root_dir in args.root_dirs), (
+        "Not all root folders exists."
+    )
 
     if args.dataset_names is None:
         args.dataset_names = [os.path.basename(root_dir) for root_dir in args.root_dirs]
     else:
-        assert len(args.dataset_names) == len(
-            args.root_dirs
-        ), "The number of root dirs and dataset names should be the same."
+        assert len(args.dataset_names) == len(args.root_dirs), (
+            "The number of root dirs and dataset names should be the same."
+        )
 
-    assert (
-        args.max_resolution[0] > 0 and args.max_resolution[1] > 0
-    ), "The maximum resolution should be larger than 0."
+    assert args.max_resolution[0] > 0 and args.max_resolution[1] > 0, (
+        "The maximum resolution should be larger than 0."
+    )
     args.max_resolution = tuple(args.max_resolution)
 
     return args
@@ -126,12 +113,10 @@ def prepare_backgrounds(
     datasets: dict[str, Path],
     out_dir: Path,
     max_samples: Union[int, SAMPLE_TYPES] = "avg",
-    labels: list[str] = ["clear", "cloudy", "foggy", "rainy", "snowy"],
-    filling_labels: list[str] = ["clear", "cloudy"],
+    labels: list[str] = ["clear", "cloudy"],
     max_resolution: tuple[int, int] = (1920, 1920),
     seed: int = 777,
     dry_run: bool = False,
-    fake_only: bool = False,
 ) -> None:
     # out_dir = out_dir / "backgrounds"
     if not dry_run:
@@ -155,11 +140,6 @@ def prepare_backgrounds(
                 (name, image) for image in collect_images(root_dir / label)
             )
 
-    if fake_only:
-        removed_labels = set(labels) - set(filling_labels)
-        for label in removed_labels:
-            label_to_images[label] = []
-
     if max_samples == "avg":
         max_samples = sum(len(images) for images in label_to_images.values()) / len(
             label_to_images
@@ -172,32 +152,12 @@ def prepare_backgrounds(
 
     # downsample images per category
     label_to_selected_images = dict[str, list[tuple[str, Path]]]()
-    for label in track(label_to_images, description="Down-sampling..."):
-        images = label_to_images[label]
-
+    for label, images in track(label_to_images.items(), description="Down-sampling..."):
         if len(images) > max_samples:
-            random.shuffle(images)
+            # random.shuffle(images)
+            images = random.sample(images, max_samples)
 
-        label_to_selected_images[label] = images[:max_samples]
-        label_to_images[label] = images[max_samples:]
-
-    # fill the category which length is not equal to max_samples with clear, cloudy images
-    normal_images = []
-    for label in filling_labels:
-        normal_images += label_to_images.get(label, [])
-    random.shuffle(normal_images)
-
-    label_to_fake_images = dict[str, list[tuple[str, Path]]]()
-    for label, images in track(
-        label_to_selected_images.items(), description="Filling missing samples..."
-    ):
-        num_missing = max_samples - len(images)
-        if num_missing > 0:
-            if len(normal_images) < num_missing:
-                raise RuntimeError(f"Not enough samples to fill the {label} samples")
-
-            label_to_fake_images[label] = normal_images[:num_missing]
-            normal_images = normal_images[num_missing:]
+        label_to_selected_images[label] = images
 
     # construct backgrounds
     if not dry_run:
@@ -220,44 +180,9 @@ def prepare_backgrounds(
                 else:
                     shutil.copy2(image, label_dir / image.name)
 
-            fake_images = label_to_fake_images.get(label, [])
-            for i, (name, image) in track(
-                enumerate(fake_images),
-                description=f"Processing {label} fake style images...",
-            ):
-                label_dir = out_dir / f"{name}_fake_style" / label
-                label_dir.mkdir(parents=True, exist_ok=True)
-
-                data = Image.open(image)
-                if data.size[0] > max_resolution[0] or data.size[1] > max_resolution[1]:
-                    data.thumbnail(max_resolution, resample=Image.LANCZOS)
-                    image = image.with_suffix(".png")
-                    # avoid duplicated filenames across clear and cloudy
-                    data.save(
-                        label_dir / f"{i}_{image.name}",
-                        icc_profile=data.info.get("icc_profile"),
-                        exif=data.info.get("exif"),
-                    )
-                else:
-                    # avoid duplicated filenames across clear and cloudy
-                    shutil.copy2(image, label_dir / f"{i}_{image.name}")
-
-    print("\n[bold green]Real[/bold green] images:")
-    label_to_counter = {
-        label: len(images) for label, images in label_to_selected_images.items()
-    }
-    print(json.dumps(label_to_counter, indent=4))
-
-    print("[bold red]Fake[/bold red] images:")
-    label_to_fake_counter = {
-        label: len(images) for label, images in label_to_fake_images.items()
-    }
-    print(json.dumps(label_to_fake_counter, indent=4))
-
     print("[bold blue]Total[/bold blue] images:")
     label_to_counter = {
-        label: counter + label_to_fake_counter.get(label, 0)
-        for label, counter in label_to_counter.items()
+        label: len(images) for label, images in label_to_selected_images.items()
     }
     print(json.dumps(label_to_counter, indent=4))
 
@@ -274,9 +199,7 @@ if __name__ == "__main__":
         out_dir,
         max_samples=args.max_samples,
         labels=args.labels,
-        filling_labels=args.filling_labels,
         max_resolution=args.max_resolution,
         seed=args.seed,
         dry_run=args.dry_run,
-        fake_only=args.fake_only,
     )
