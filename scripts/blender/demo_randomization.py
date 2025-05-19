@@ -5,12 +5,12 @@ import argparse
 import os
 import random
 from math import radians
-from typing import Optional
 
 from blenderproc.python.types.MeshObjectUtility import MeshObject
 from mathutils import Euler, Vector
 from matplotlib import font_manager
 from PIL import Image, ImageDraw, ImageFont
+from rich import print
 
 from uav_data_generation.blender.camera import align_camera_pose
 from uav_data_generation.blender.config import BaseConfig
@@ -18,7 +18,10 @@ from uav_data_generation.blender.drone import randomize_drone_properties
 from uav_data_generation.blender.setup import setup
 from uav_data_generation.blender.utils.bbox import find_bbox_xyxy_by_alpha
 from uav_data_generation.blender.utils.material import collect_materials_by_cp
-from uav_data_generation.blender.utils.utils import get_cp, reset_keyframes
+from uav_data_generation.blender.utils.utils import (
+    get_cp,
+    reset_keyframes,
+)
 
 
 def parse_args():
@@ -88,36 +91,20 @@ def draw_bounding_box(image: Image.Image, coord: tuple[int, int, int, int]):
 
 
 def demo_randomization(
-    scene_path: str,
-    background_path: str,
-    models: Optional[list[str]] = None,
+    config: BaseConfig,
     x_range: tuple[int, int] = (-45, 45),
     y_range: tuple[int, int] = (-45, 45),
     z_range: tuple[int, int] = (0, 360),
     adaptive_alignment: bool = False,
     alignment_z_offset: float = 0,
     alignment_z_step: float = 0.1,
-    motion_blur: bool = True,
-    render_resolution: tuple[int, int] = (1920, 1920),
-    render_max_samples: int = 1024,
-    render_tile_size: int = 1024,
     out_dir: str = "outputs",
     samples: int = 3,
     device_type: str = "OPTIX",
     devices: list[int] = [0],
     **kwargs,
 ):
-    objs, uav_models = setup(
-        scene_path,
-        background_path,
-        device_type,
-        devices,
-        motion_blur=motion_blur,
-        resolution=render_resolution,
-        max_samples=render_max_samples,
-        tile_size=render_tile_size,
-        models=models,
-    )
+    objs, uav_models = setup(config, device_type, devices)
     materials = collect_materials_by_cp()
 
     # place the camera in front of the UAV model
@@ -216,4 +203,4 @@ if __name__ == "__main__":
     print(cfg)
 
     os.environ["BLENDER_PROC_RANDOM_SEED"] = str(args.pop("seed"))
-    demo_randomization(**cfg.to_dict(), **args)
+    demo_randomization(cfg, **cfg.to_dict(), **args)

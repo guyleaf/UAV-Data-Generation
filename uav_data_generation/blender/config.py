@@ -3,6 +3,10 @@ import os
 from abc import ABC, abstractmethod
 from typing import Optional
 
+from blenderproc.python.utility.Initializer import DefaultConfig
+
+from .utils.utils import get_blender_preset
+
 AREA_RANGES = tuple[tuple[int, int], tuple[int, int], tuple[int, int]]
 
 
@@ -23,13 +27,6 @@ class BaseConfig(ABC):
     def images_path(self) -> str:
         """Path to the folder of image files"""
         return os.path.join(self.out_dir, "backgrounds")
-
-    # # Path to the .blend scene file
-    # scene_path: str
-    # # Path to the background HDRI file
-    # background_path: str
-    # # Path to the folder of image files
-    # images_path: str
 
     # randomization settings
 
@@ -63,7 +60,7 @@ class BaseConfig(ABC):
     # scale_range: tuple[float, float] = (0.2, 0.5)
     # The minimum UAV area after scaling.
     # min_uav_area: int = 1
-    # Allow upscaling if UAV is smaller than the sampled scale.
+    # Allow upscaling if UAV is smaller than the sampled size.
     allow_upscaling: bool = False
 
     # render settings
@@ -76,6 +73,42 @@ class BaseConfig(ABC):
     render_max_samples: int = 1024
     # The tile size for rendering a image (less -> slower & lower VRAM requirement, higher -> faster & higher VRAM requirement).
     render_tile_size: int = 1920
+    # Adaptive noise threshold
+    render_sampling_noise_threshold: float = 1e-2
+    # The denoiser for rendering
+    render_denoiser = "OPENIMAGEDENOISE"
+
+    # Frame per second, unused in pipeline
+    fps: int = 60
+    # refers to https://docs.blender.org/api/3.5/bpy_types_enum_items/image_type_items.html
+    file_format: str = "PNG"
+    color_depth: int = 8
+    # Transparency must be opened
+    enable_transparency = True
+    jpg_quality = 95
+    # Control levels of all subdivision modifiers
+    simplify_subdivision_render = 3
+
+    # ligh paths settings
+
+    # use the light preset or the custom parameters
+    use_light_preset: bool = True
+    light_preset_path: str = get_blender_preset("cycles/integrator", "Default")
+
+    # custom ligh paths parameters
+    max_bounces: int = DefaultConfig.max_bounces
+    caustics_reflective: bool = True
+    caustics_refractive: bool = True
+    diffuse_bounces: int = DefaultConfig.diffuse_bounces
+    glossy_bounces: int = DefaultConfig.glossy_bounces
+    transmission_bounces: int = DefaultConfig.transmission_bounces
+    volume_bounces: int = DefaultConfig.volume_bounces
+    transparent_max_bounces: int = DefaultConfig.transparency_bounces
+
+    # fast GI
+    use_fast_gi: bool = False
+    ao_bounces: int = 1
+    ao_bounces_render: int = DefaultConfig.ao_bounces_render
 
     # misc settings
 
@@ -147,36 +180,6 @@ class BaseConfig(ABC):
 
     def to_dict(self):
         return {arg: getattr(self, arg) for arg in self._get_args()}
-
-
-class SceneConfig:
-    """
-    All the default config values are specified in this class.
-    """
-
-    # Scene
-    fps = 60
-
-    # Renderer
-    file_format = "PNG"
-    color_depth = 8
-    enable_transparency = True
-    jpg_quality = 95
-    sampling_noise_threshold = 0.01
-    denoiser = "OPENIMAGEDENOISE"
-    simplify_subdivision_render = 3
-
-    # Ligh Paths: use the default preset in blender 3.5.1
-    max_bounces = 12
-    diffuse_bounces = 4
-    glossy_bounces = 4
-    transmission_bounces = 12
-    volume_bounces = 0
-    transparency_bounces = 8
-
-    # Fast GI
-    use_fast_gi = False
-    ao_bounces_render = 3
 
 
 if __name__ == "__main__":
