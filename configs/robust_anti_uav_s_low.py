@@ -29,7 +29,12 @@ class Config(BaseConfig):
     render_max_samples: int = 512
     motion_blur: bool = False
 
-    out_dir: str = os.path.expanduser("~/data/UAV/Robust_Anti_UAV_S")
+    # control levels of all subdivision modifiers
+    # our models are using level 1.
+    # so, 0 means low poly.
+    simplify_subdivision_render: int = 0
+
+    out_dir: str = os.path.expanduser("~/data/UAV/Robust_Anti_UAV_S_Low")
 
 
 if __name__ == "__main__":
