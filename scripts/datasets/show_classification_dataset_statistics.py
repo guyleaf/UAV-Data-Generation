@@ -122,7 +122,7 @@ def make_label_dist_plot(
     axes.set_title("Label")
     axes.set_ylabel("Counts")
     # axes.xaxis.set_ticks(x + (width * len(subsets)) / 2, labels)
-    axes.xaxis.set_ticks(axes.xaxis.get_ticklocs()[1:-1], labels)
+    axes.xaxis.set_ticks(list(range(len(labels))), labels)
     if not all_in_one:
         axes.legend(loc="upper right")
 

@@ -1,5 +1,3 @@
-from typing import Optional
-
 import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the top due to the check of blenderproc
 
 import os
@@ -8,20 +6,10 @@ from operator import methodcaller
 import bpy
 from blenderproc.api.types import Entity
 
-from .config import SceneConfig
+from .config import BaseConfig
 
 
-def setup(
-    scene_path: str,
-    background_path: str,
-    device_type: str,
-    devices: list[int],
-    motion_blur: bool = False,
-    resolution: tuple[int, int] = (1920, 1920),
-    max_samples: int = 1024,
-    tile_size: int = 1024,
-    models: Optional[list[str]] = None,
-):
+def setup(config: BaseConfig, device_type: str, devices: list[int]):
     bproc.init()
 
     # set render device
@@ -33,7 +21,7 @@ def setup(
         desired_gpu_ids=devices,
     )
 
-    if SceneConfig.denoiser == "OPENIMAGEDENOISE":
+    if config.render_denoiser == "OPENIMAGEDENOISE":
         # WORKAROUND: currently, the blenderproc api doesn't support enabling OpenImageDenoise
         bproc.renderer.set_denoiser(None)
         bpy.context.scene.cycles.use_denoising = True
@@ -42,43 +30,55 @@ def setup(
         bpy.context.scene.cycles.denoising_input_passes = "RGB_ALBEDO_NORMAL"
         bpy.context.scene.cycles.denoising_prefilter = "ACCURATE"
     else:
-        bproc.renderer.set_denoiser(SceneConfig.denoiser)
+        bproc.renderer.set_denoiser(config.render_denoiser)
 
-    # Setup scene settingss
-    bpy.context.scene.render.fps = SceneConfig.fps
-    bproc.camera.set_resolution(*resolution)
+    # setup scene settings
+    bpy.context.scene.render.fps = config.fps
+    bproc.camera.set_resolution(*config.render_resolution)
     bproc.renderer.set_output_format(
-        SceneConfig.file_format,
-        SceneConfig.color_depth,
-        SceneConfig.enable_transparency,
-        SceneConfig.jpg_quality,
+        config.file_format,
+        config.color_depth,
+        config.enable_transparency,
+        config.jpg_quality,
     )
-    bproc.renderer.set_max_amount_of_samples(max_samples)
-    bproc.renderer.set_noise_threshold(SceneConfig.sampling_noise_threshold)
-    bpy.context.scene.cycles.tile_size = tile_size
-
-    bpy.context.scene.cycles.use_fast_gi = SceneConfig.use_fast_gi
-    bproc.renderer.set_light_bounces(
-        SceneConfig.diffuse_bounces,
-        SceneConfig.glossy_bounces,
-        SceneConfig.ao_bounces_render,
-        SceneConfig.max_bounces,
-        SceneConfig.transmission_bounces,
-        SceneConfig.transparency_bounces,
-        SceneConfig.volume_bounces,
+    bproc.renderer.set_max_amount_of_samples(config.render_max_samples)
+    bproc.renderer.set_noise_threshold(config.render_sampling_noise_threshold)
+    bpy.context.scene.cycles.tile_size = config.render_tile_size
+    bpy.context.scene.render.use_simplify = True
+    bpy.context.scene.render.simplify_subdivision_render = (
+        config.simplify_subdivision_render
     )
 
-    if motion_blur:
+    # light paths settings
+    if config.use_light_preset:
+        print("Loading the light preset:", config.light_preset_path)
+        bpy.utils.execfile(config.light_preset_path)
+    else:
+        bpy.context.scene.cycles.caustics_reflective = config.caustics_reflective
+        bpy.context.scene.cycles.caustics_refractive = config.caustics_refractive
+        bpy.context.scene.cycles.use_fast_gi = config.use_fast_gi
+        bpy.context.scene.cycles.ao_bounces = config.ao_bounces
+        bproc.renderer.set_light_bounces(
+            config.diffuse_bounces,
+            config.glossy_bounces,
+            config.ao_bounces_render,
+            config.max_bounces,
+            config.transmission_bounces,
+            config.transparent_max_bounces,
+            config.volume_bounces,
+        )
+
+    if config.motion_blur:
         print("Enabling motion blur")
         bproc.renderer.enable_motion_blur(motion_blur_length=0.5)
 
-    print("\nLoading the background:", os.path.basename(background_path))
-    bproc.world.set_world_background_hdr_img(background_path)
+    print("\nLoading the background:", os.path.basename(config.background_path))
+    bproc.world.set_world_background_hdr_img(config.background_path)
 
     # note: only objects in the obj_types can be loaded
     # otherwise, such as scene settings, they aren't loaded by blenderprc
     objs = bproc.loader.load_blend(
-        scene_path,
+        config.scene_path,
         obj_types=["mesh", "light", "empty", "camera"],
         data_blocks=["objects", "materials"],
     )
@@ -96,8 +96,8 @@ def setup(
             model.get_children(return_all_offspring=True), key=methodcaller("get_name")
         )
 
-    if models is not None:
-        uav_model_dict = {name: uav_model_dict[name] for name in models}
+    if config.models is not None:
+        uav_model_dict = {name: uav_model_dict[name] for name in config.models}
 
     assert len(uav_model_dict) > 0, "UAV model is not found."
     print("\nFind", len(uav_model_dict), "UAV models")

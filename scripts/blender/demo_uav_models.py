@@ -2,12 +2,12 @@ import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the to
 
 import argparse
 import os
-from typing import Optional
 
 import bpy
 import numpy as np
 from blenderproc.python.types.MeshObjectUtility import MeshObject
 from mathutils import Matrix, Vector
+from rich import print
 
 from uav_data_generation.blender.config import BaseConfig
 from uav_data_generation.blender.drone import randomize_drone_materials
@@ -92,31 +92,15 @@ def calculate_matrix_world_from_poi(
 
 
 def demo_uav_models(
-    scene_path: str,
-    background_path: str,
-    models: Optional[list[str]] = None,
+    config: BaseConfig,
     alignment_z_offset: float = 0,
-    motion_blur: bool = True,
-    render_resolution: tuple[int, int] = (1920, 1920),
-    render_max_samples: int = 1024,
-    render_tile_size: int = 1024,
     samples: int = 60,
     out_dir: str = "outputs",
     device_type: str = "OPTIX",
     devices: list[int] = [0],
     **kwargs,
 ):
-    objs, uav_models = setup(
-        scene_path,
-        background_path,
-        device_type,
-        devices,
-        motion_blur=motion_blur,
-        resolution=render_resolution,
-        max_samples=render_max_samples,
-        tile_size=render_tile_size,
-        models=models,
-    )
+    objs, uav_models = setup(config, device_type, devices)
     materials = collect_materials_by_cp()
     camera = bpy.context.scene.camera
 
@@ -198,4 +182,4 @@ if __name__ == "__main__":
     print(cfg)
 
     os.environ["BLENDER_PROC_RANDOM_SEED"] = str(args.pop("seed"))
-    demo_uav_models(**cfg.to_dict(), **args)
+    demo_uav_models(cfg, **cfg.to_dict(), **args)

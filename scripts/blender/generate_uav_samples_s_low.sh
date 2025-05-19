@@ -2,5 +2,5 @@
 set -eu
 
 blenderproc run -- "$(dirname "$0")/generate_foregrounds.py" \
-configs/weather_anti_uav_s.py \
---devices 4
+configs/robust_anti_uav_s_low.py \
+--devices 0

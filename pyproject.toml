@@ -54,8 +54,5 @@ dev = [
     "mkdocs-glightbox"
 ]
 
-[project.scripts]
-uav-gen-eval = "uav_data_generation.evaluation:cli"
-
 [tool.hatch.build.targets.uav_data_generation]
 only-include = ["uav_data_generation"]

@@ -1,5 +1,8 @@
 import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the top due to the check of blenderproc
 
+import json
+import shutil
+
 import bpy  # noqa: F401 # isort:skip
 import argparse
 import os
@@ -246,10 +249,8 @@ def sample_uav_location(
 
 
 def generate_foregrounds(
-    scene_path: str,
-    background_path: str,
+    config: BaseConfig,
     images_path: str,
-    models: Optional[list[str]] = None,
     x_range: tuple[int, int] = (-45, 45),
     y_range: tuple[int, int] = (-45, 45),
     z_range: tuple[int, int] = (0, 360),
@@ -266,10 +267,6 @@ def generate_foregrounds(
     adaptive_alignment: bool = True,
     alignment_z_offset: float = 0,
     alignment_z_step: float = 0.1,
-    motion_blur: bool = True,
-    render_resolution: tuple[int, int] = (1920, 1920),
-    render_max_samples: int = 1024,
-    render_tile_size: int = 1024,
     out_dir: str = "outputs",
     device_type: str = "OPTIX",
     devices: list[int] = [0],
@@ -278,17 +275,7 @@ def generate_foregrounds(
     checkpoint_interval: int = 5,
     **kwargs,
 ):
-    objs, uav_models = setup(
-        scene_path,
-        background_path,
-        device_type,
-        devices,
-        motion_blur=motion_blur,
-        resolution=render_resolution,
-        max_samples=render_max_samples,
-        tile_size=render_tile_size,
-        models=models,
-    )
+    objs, uav_models = setup(config, device_type, devices)
     materials = collect_materials_by_cp()
 
     # place the camera in front of the UAV model
@@ -320,6 +307,10 @@ def generate_foregrounds(
             assert os.path.exists(image_path), (
                 f"The foreground image {image_path} is not Found."
             )
+
+    # restore random state
+    if checkpoint is not None:
+        checkpoint.restore_random_states()
 
     uav_models = list(uav_models.values())
     start_index = checkpoint.image_index + 1 if checkpoint is not None else 0
@@ -453,7 +444,8 @@ if __name__ == "__main__":
     # 4. COCOWriter
 
     args = vars(parse_args())
-    cfg = BaseConfig.from_file(args.pop("config_path"))
+    cfg_path = args.pop("config_path")
+    cfg = BaseConfig.from_file(cfg_path)
 
     print()
     print("Arguments:", args)
@@ -464,7 +456,14 @@ if __name__ == "__main__":
 
     print(cfg)
 
+    # save args and config
+    with open(os.path.join(cfg.out_dir, "args.json"), "w") as f:
+        json.dump(args, f, indent=4)
+    shutil.copy2(cfg_path, os.path.join(cfg.out_dir, "config.py"))
+
     seed = args.pop("seed")
+    os.environ["BLENDER_PROC_RANDOM_SEED"] = str(seed)
+
     ckpt_path = args.pop("checkpoint")
     ckpt = None
     if args.pop("resume"):
@@ -475,13 +474,11 @@ if __name__ == "__main__":
             ckpt_path = os.path.join(ckpt_root_path, ckpt_path)
 
         ckpt = Checkpoint.from_pickle(ckpt_path)
-        ckpt.restore_random_states()
         print(f"Resume from the last checkpoint, {ckpt_path}.")
-    else:
-        os.environ["BLENDER_PROC_RANDOM_SEED"] = str(seed)
 
     # TODO: refactor to use class
     generate_foregrounds(
+        cfg,
         **cfg.to_dict(),
         **args,
         checkpoint=ckpt,
