@@ -311,6 +311,7 @@ def generate_foregrounds(
     # restore random state
     if checkpoint is not None:
         checkpoint.restore_random_states()
+        print("Restored the random states!")
 
     uav_models = list(uav_models.values())
     start_index = checkpoint.image_index + 1 if checkpoint is not None else 0
@@ -443,38 +444,38 @@ if __name__ == "__main__":
     # 3. current progress of generated images (index)
     # 4. COCOWriter
 
-    args = vars(parse_args())
-    cfg_path = args.pop("config_path")
-    cfg = BaseConfig.from_file(cfg_path)
+    args = parse_args()
+    cfg = BaseConfig.from_file(args.config_path)
 
+    if args.out_dir is not None:
+        cfg.out_dir = os.path.expanduser(args.out_dir)
+
+    ckpt = None
+    if args.resume:
+        if args.checkpoint is None:
+            ckpt_root_path = os.path.join(cfg.out_dir, "checkpoints")
+            # use the latest checkpoint
+            args.checkpoint = sorted(os.listdir(ckpt_root_path))[-1]
+            args.checkpoint = os.path.join(ckpt_root_path, args.checkpoint)
+
+        ckpt = Checkpoint.from_pickle(args.checkpoint)
+        print(f"Resume from the last checkpoint, {args.checkpoint}.")
+
+    args = vars(args)
     print()
     print("Arguments:", args)
-
-    out_dir = args.pop("out_dir")
-    if out_dir is not None:
-        cfg.out_dir = os.path.expanduser(out_dir)
-
     print(cfg)
 
     # save args and config
     with open(os.path.join(cfg.out_dir, "args.json"), "w") as f:
         json.dump(args, f, indent=4)
-    shutil.copy2(cfg_path, os.path.join(cfg.out_dir, "config.py"))
+    shutil.copy2(args.pop("config_path"), os.path.join(cfg.out_dir, "config.py"))
 
+    args.pop("out_dir")
+    args.pop("resume")
+    args.pop("checkpoint")
     seed = args.pop("seed")
     os.environ["BLENDER_PROC_RANDOM_SEED"] = str(seed)
-
-    ckpt_path = args.pop("checkpoint")
-    ckpt = None
-    if args.pop("resume"):
-        if ckpt_path is None:
-            ckpt_root_path = os.path.join(cfg.out_dir, "checkpoints")
-            # use the latest checkpoint
-            ckpt_path = sorted(os.listdir(ckpt_root_path))[-1]
-            ckpt_path = os.path.join(ckpt_root_path, ckpt_path)
-
-        ckpt = Checkpoint.from_pickle(ckpt_path)
-        print(f"Resume from the last checkpoint, {ckpt_path}.")
 
     # TODO: refactor to use class
     generate_foregrounds(
