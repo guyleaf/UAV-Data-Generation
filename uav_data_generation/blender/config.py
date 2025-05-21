@@ -44,7 +44,7 @@ class BaseConfig(ABC):
     # Align the camera with the UAV and move backward with the offset (m) (useful with motion blur).
     alignment_z_offset: float = 0
     # Increase the alignment distance with the step (m) (--adaptive-alignment only).
-    alignment_z_step: float = 1e-4
+    alignment_z_step: float = 1e-3
 
     # The maximum IoF among UAVs in image. (max_iof > 0 -> accept occlusion)
     # IoF (intersection over foreground) = overlap / bbox
