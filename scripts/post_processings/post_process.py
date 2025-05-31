@@ -24,7 +24,7 @@ def parse_args():
     parser.add_argument(
         "--images-dir",
         type=str,
-        default="stylized",
+        default="harmonized",
         help="relative path of images folder",
     )
     parser.add_argument(
