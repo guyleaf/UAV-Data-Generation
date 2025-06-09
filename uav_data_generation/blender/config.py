@@ -46,10 +46,13 @@ class BaseConfig(ABC):
     # Increase the alignment distance with the step (m) (--adaptive-alignment only).
     alignment_z_step: float = 1e-3
 
-    # The maximum IoF among UAVs in image. (max_iof > 0 -> accept occlusion)
-    # IoF (intersection over foreground) = overlap / bbox
+    # The maximum IoF among UAVs in image. (max_uavs_iof > 0 -> accept occlusion)
+    # IoF (intersection over foreground) = overlap / bbox (UAV1 or UAV2)
     # referenced from mmdetection
-    max_iof: float = 0.2
+    max_uavs_iof: float = 0.2
+    # The minimum IoF between UAV and the image. (min_uav_image_iof < 1 -> accept occlusion)
+    # IoF (intersection over foreground) = overlap / bbox (UAV)
+    min_uav_image_iof: float = 1
     # The area ranges [a, b) for small, medium, large.
     area_ranges: AREA_RANGES = (
         (1**2, 32**2),
@@ -176,7 +179,10 @@ class BaseConfig(ABC):
             assert x[1] <= y[0], (
                 "The start of area range should be larger or equal to previous end one."
             )
-        assert 0 <= self.max_iof <= 1, "The maximum IoF should be in (0, 1)."
+        assert 0 <= self.max_uavs_iof <= 1, "The maximum UAVs IoF should be in [0, 1]."
+        assert 0 < self.min_uav_image_iof <= 1, (
+            "The minimum IoF between UAV and image should be in (0, 1]."
+        )
 
     def to_dict(self):
         return {arg: getattr(self, arg) for arg in self._get_args()}

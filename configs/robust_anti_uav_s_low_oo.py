@@ -16,9 +16,10 @@ class Config(BaseConfig):
             "~/data/UAV/blender/assets/backgrounds/studiolights/city.exr"
         )
 
-    x_range: tuple[int, int] = (-30, 30)
-    y_range: tuple[int, int] = (-30, 30)
+    x_range: tuple[int, int] = (-45, 45)
+    y_range: tuple[int, int] = (-45, 45)
     max_uavs_iof: float = 0.2
+    min_uav_image_iof: float = 0.5
     sample_range: tuple[int, int] = (1, 4)
     area_ranges: AREA_RANGES = (
         (20**2, 32**2),
@@ -29,7 +30,12 @@ class Config(BaseConfig):
     render_max_samples: int = 512
     motion_blur: bool = False
 
-    out_dir: str = os.path.expanduser("~/data/UAV/Robust_Anti_UAV_S")
+    # control levels of all subdivision modifiers
+    # our models are using level 1.
+    # so, 0 means low poly.
+    simplify_subdivision_render: int = 0
+
+    out_dir: str = os.path.expanduser("~/data/UAV/Robust_Anti_UAV_S_Low_OO")
 
 
 if __name__ == "__main__":
