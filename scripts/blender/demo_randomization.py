@@ -8,8 +8,7 @@ from math import radians
 
 from blenderproc.python.types.MeshObjectUtility import MeshObject
 from mathutils import Euler, Vector
-from matplotlib import font_manager
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 from rich import print
 
 from uav_data_generation.blender.camera import align_camera_pose
@@ -19,6 +18,7 @@ from uav_data_generation.blender.setup import setup
 from uav_data_generation.blender.utils.bbox import find_bbox_xyxy_by_alpha
 from uav_data_generation.blender.utils.material import collect_materials_by_cp
 from uav_data_generation.blender.utils.utils import (
+    draw_bbox_xyxy,
     get_cp,
     reset_keyframes,
 )
@@ -72,22 +72,6 @@ def parse_args():
     args = parser.parse_args()
 
     return args
-
-
-def draw_bounding_box(image: Image.Image, coord: tuple[int, int, int, int]):
-    size = (coord[2] - coord[0]) * (coord[3] - coord[1])
-
-    draw = ImageDraw.Draw(image)
-    draw.rectangle(coord, outline="red")
-
-    text = f"Object size: {size:,}"
-    font_file = font_manager.findfont("arial")
-    font = ImageFont.truetype(font_file, 36)
-    text_xy = list(coord[:2])
-    text_coord = text_xy + list(draw.textbbox(text_xy, text=text, font=font)[2:])
-
-    draw.rectangle(text_coord, fill="red")
-    draw.text(text_coord[:2], text=text, font=font, fill="white")
 
 
 def demo_randomization(
@@ -163,7 +147,7 @@ def demo_randomization(
 
             # visualize with the bounding box
             bbox = find_bbox_xyxy_by_alpha(color)
-            draw_bounding_box(image, bbox)
+            draw_bbox_xyxy(image, bbox)
 
             # write the color to a .png container in the run-specific output directory
             out_path = os.path.join(out_dir, name)
