@@ -353,7 +353,6 @@ def generate_foregrounds(
                 area_ranges,
                 image_size,
                 uav_image.size,
-                # min_uav_area=min_uav_area,
                 allow_upscaling=allow_upscaling,
             )
 
