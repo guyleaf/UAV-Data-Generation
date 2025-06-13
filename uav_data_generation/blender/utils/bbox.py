@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Literal, Union
 
 import numpy as np
 
@@ -15,6 +15,27 @@ def find_bbox_xyxy_by_alpha(image: np.ndarray) -> tuple[int, int, int, int]:
     return min_x, min_y, max_x, max_y
 
 
+def find_overlap_bbox(
+    bbox1: Union[np.ndarray, tuple[int, int, int, int]],
+    bbox2: Union[np.ndarray, tuple[int, int, int, int]],
+) -> tuple[int, int, int, int]:
+    if not isinstance(bbox1, np.ndarray):
+        bbox1 = np.array(bbox1)
+    if not isinstance(bbox2, np.ndarray):
+        bbox2 = np.array(bbox2)
+
+    bbox1 = bboxes_xywh_to_xyxy(bbox1[None, :])[0]
+    bbox2 = bboxes_xywh_to_xyxy(bbox2[None, :])[0]
+
+    x_start = max(bbox1[0], bbox2[0])
+    y_start = max(bbox1[1], bbox2[1])
+    x_end = min(bbox1[2], bbox2[2])
+    y_end = min(bbox1[3], bbox2[3])
+    w = max(x_end - x_start, 0)
+    h = max(y_end - y_start, 0)
+    return x_start, y_start, w, h
+
+
 def bboxes_xywh_to_xyxy(bboxes: np.ndarray):
     bboxes[:, 2:] = bboxes[:, :2] + bboxes[:, 2:]
     return bboxes
@@ -25,7 +46,7 @@ def bboxes_xywh_to_xyxy(bboxes: np.ndarray):
 def bbox_overlaps(
     bboxes1: Union[np.ndarray, list[tuple[int, int, int, int]]],
     bboxes2: Union[np.ndarray, list[tuple[int, int, int, int]]],
-    mode: str = "iou",
+    mode: Literal["iou", "iof"] = "iou",
     eps: float = 1e-6,
 ):
     """Calculate the ious between each bbox of bboxes1 and bboxes2.

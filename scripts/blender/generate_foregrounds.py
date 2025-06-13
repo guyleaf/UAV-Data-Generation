@@ -28,9 +28,13 @@ from uav_data_generation.blender.setup import setup
 from uav_data_generation.blender.utils.bbox import (
     bbox_overlaps,
     find_bbox_xyxy_by_alpha,
+    find_overlap_bbox,
 )
 from uav_data_generation.blender.utils.material import collect_materials_by_cp
-from uav_data_generation.blender.utils.utils import get_cp, reset_keyframes
+from uav_data_generation.blender.utils.utils import (
+    get_cp,
+    reset_keyframes,
+)
 from uav_data_generation.utils.io import collect_images
 
 
@@ -165,7 +169,6 @@ def sample_uav_size(
     area_ranges: AREA_RANGES,
     image_size: tuple[int, int],
     uav_size: tuple[int, int],
-    # min_uav_area: int = 1,
     allow_upscaling: bool = False,
 ) -> tuple[int, int]:
     image_w, image_h = image_size
@@ -185,14 +188,7 @@ def sample_uav_size(
         # 2. randomly sample a area from [a, b)
         area = random.randrange(area_start, area_end)
 
-        # scale_ratio = random.uniform(*area_ranges)
-        # scaled_image_total_size = image_total_size * scale_ratio
-
-        # if not allow upscaling or smaller than min_uav_area, then skip it.
-        # if (
-        #     scaled_image_total_size > uav_total_size and not allow_upscaling
-        # ) or scaled_image_total_size < min_uav_area:
-        #     continue
+        # if not allow upscaling and larger than the original UAV area, then skip it.
         if area > uav_area and not allow_upscaling:
             continue
 
@@ -222,29 +218,34 @@ def sample_uav_location(
     image_size: tuple[int, int],
     uav_size: tuple[int, int],
     bboxes: list[tuple[int, int, int, int]],
-    max_iof: float = 0,
+    min_uav_image_iof: float = 1,
+    max_uavs_iof: float = 0,
 ) -> Optional[tuple[int, int]]:
-    end_w, end_h = image_size[0] - uav_size[0], image_size[1] - uav_size[1]
+    half_w, half_h = image_size[0] // 2, image_size[1] // 2
+    start_w, start_h = -half_w, -half_h
+    end_w, end_h = image_size[0] + half_w, image_size[1] + half_h
 
-    # if end_w < 0 or end_h < 0:
-    #     print(
-    #         f"Warning! Cannot find an ideal location fitting the UAV size {uav_size}."
-    #     )
-    #     return None
-
+    image_bbox = [[0, 0, *image_size]]
     for _ in range(50):
         # randomly sample a position from image based on the actual size
-        x = random.randint(0, end_w)
-        y = random.randint(0, end_h)
+        x = random.randint(start_w, end_w)
+        y = random.randint(start_h, end_h)
+
+        bbox = [[x, y, *uav_size]]
+        # check if there is no overlap (or below the overlap threshold) between bbox and image
+        iof = bbox_overlaps(bbox, image_bbox, mode="iof")
+        if iof[0] < min_uav_image_iof:
+            continue
 
         # check if there is no overlap (or below the overlap threshold) among bboxes list
-        bbox = [[x, y, *uav_size]]
         iofs1 = bbox_overlaps(bbox, bboxes, mode="iof")
         iofs2 = bbox_overlaps(bboxes, bbox, mode="iof")
-        if (iofs1 <= max_iof).all() and (iofs2 <= max_iof).all():
+        if (iofs1 <= max_uavs_iof).all() and (iofs2 <= max_uavs_iof).all():
             return x, y
 
-    print(f"Warning! Cannot find an ideal location to fit the maximum IoF {max_iof}.")
+    print(
+        f"Warning! Cannot find an ideal location to fit the maximum IoF {max_uavs_iof}."
+    )
     return None
 
 
@@ -255,14 +256,13 @@ def generate_foregrounds(
     y_range: tuple[int, int] = (-45, 45),
     z_range: tuple[int, int] = (0, 360),
     sample_range: tuple[int, int] = (1, 20),
-    max_iof: float = 0.5,
+    max_uavs_iof: float = 0.5,
+    min_uav_image_iof: float = 0.5,
     area_ranges: AREA_RANGES = (
         (1**2, 32**2),
         (32**2, 96**2),
         (96**2, 100000**2),
     ),
-    # scale_range: tuple[float, float] = (0.2, 0.8),
-    # min_uav_area: int = 1,
     allow_upscaling: bool = False,
     adaptive_alignment: bool = True,
     alignment_z_offset: float = 0,
@@ -348,30 +348,25 @@ def generate_foregrounds(
             uav_image = uav_image[y1:y2, x1:x2]
             uav_image = Image.fromarray(uav_image, "RGBA")
 
-            # retry
-            # for _ in range(50):
             # determine the scaled size of UAV
             scaled_uav_size = sample_uav_size(
                 area_ranges,
                 image_size,
                 uav_image.size,
-                # min_uav_area=min_uav_area,
                 allow_upscaling=allow_upscaling,
             )
 
             # determine the location of UAV on the foreground image
             uav_location = sample_uav_location(
-                image_size, scaled_uav_size, uav_bboxes, max_iof=max_iof
+                image_size,
+                scaled_uav_size,
+                uav_bboxes,
+                min_uav_image_iof=min_uav_image_iof,
+                max_uavs_iof=max_uavs_iof,
             )
-            # if uav_location is not None:
-            #     break
             if uav_location is None:
-                print("Skipping...", end="")
+                print("Skipping...")
                 continue
-            # else:
-            # after trying 50 times, stop generating. (no space)
-            # print("Skipping...", end="")
-            # continue
 
             # scale the UAV
             # filter comparison: https://pillow.readthedocs.io/en/stable/handbook/concepts.html#filters-comparison-table
@@ -390,6 +385,8 @@ def generate_foregrounds(
         for i in indices:
             uav_image, bbox = uav_images[i], uav_bboxes[i]
             foreground_image.alpha_composite(uav_image, dest=bbox[:2])
+            # remove the area outside of the image
+            uav_bboxes[i] = find_overlap_bbox(bbox, (0, 0, *foreground_image.size))
 
         # get output path
         rel_path = os.path.relpath(os.path.dirname(image_path), images_path)

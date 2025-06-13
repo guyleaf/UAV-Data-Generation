@@ -18,7 +18,7 @@ class Config(BaseConfig):
 
     x_range: tuple[int, int] = (-30, 30)
     y_range: tuple[int, int] = (-30, 30)
-    max_iof: float = 0.2
+    max_uavs_iof: float = 0.2
     sample_range: tuple[int, int] = (1, 4)
     area_ranges: AREA_RANGES = (
         (20**2, 32**2),

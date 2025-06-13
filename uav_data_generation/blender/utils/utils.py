@@ -2,7 +2,12 @@ import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the to
 
 
 import bpy
+import numpy as np
 from blenderproc.api.types import Entity, Struct
+from matplotlib import font_manager
+from PIL import Image, ImageDraw, ImageFont
+
+from .bbox import bboxes_xywh_to_xyxy
 
 
 def get_cp(obj: Struct, key: str, default=None):
@@ -67,3 +72,28 @@ def select_objects(objs: list[Entity]):
     bpy.context.view_layer.objects.active = objs[0].blender_obj
     for obj in objs:
         obj.select()
+
+
+def draw_bbox_xywh(image: Image.Image, bbox: tuple[int, int, int, int]):
+    assert isinstance(bbox, tuple)
+    coord = tuple(bboxes_xywh_to_xyxy(np.array(bbox)[None, :])[0])
+    draw_bbox_xyxy(image, coord)
+
+
+def draw_bbox_xyxy(
+    image: Image.Image, coord: tuple[int, int, int, int], font_size: int = 15
+):
+    assert isinstance(coord, tuple)
+    size = (coord[2] - coord[0]) * (coord[3] - coord[1])
+
+    draw = ImageDraw.Draw(image)
+    draw.rectangle(coord, outline="red")
+
+    text = f"Object size: {size:,}"
+    font_file = font_manager.findfont("arial")
+    font = ImageFont.truetype(font_file, size=font_size)
+    text_xy = list(coord[:2])
+    text_coord = text_xy + list(draw.textbbox(text_xy, text=text, font=font)[2:])
+
+    draw.rectangle(text_coord, fill="red")
+    draw.text(text_coord[:2], text=text, font=font, fill="white")
