@@ -43,7 +43,10 @@ conda activate uav_data_generation
 blenderproc run -- "scripts/blender/generate_foregrounds.py" configs/robust_anti_uav_low.py --devices 0
 
 # Demo with material randomization
-blenderproc run -- "scripts/blender/demo_randomization.py" configs/robust_anti_uav_demo.py --out-dir "$HOME/work/work_dirs/demo_randomization" --devices 0 --samples 10
+blenderproc run -- "scripts/blender/demo_randomization.py" configs/robust_anti_uav_demo.py --out-dir <output_path> --devices 0 --samples 10
+
+# Demo multi-view with UAV model and random material
+blenderproc run -- "scripts/blender/demo_uav_models.py" "configs/robust_anti_uav_demo.py" --out-dir <output_path> --devices 0 --samples 30
 
 # Batch generation scripts
 bash scripts/blender/generate_uav_samples_low.sh
@@ -55,11 +58,14 @@ bash scripts/blender/generate_uav_samples_s_low.sh
 # Full pipeline for Robust Anti-UAV Low dataset
 bash scripts/prepare_robust_anti_uav_low.sh
 
-# Prepare backgrounds from weather datasets  
-python scripts/pre_processings/prepare_backgrounds.py <input_paths> <output_path> --dataset-names <input_path_names> --max-samples <max_samples_per_label>
+# Full pipeline for Robust Anti-UAV S Low dataset
+bash scripts/prepare_robust_anti_uav_s_low.sh
 
-# Prepare specific datasets
+# Prepare Image2Weather dataset
 bash scripts/datasets/prepare_image2weather.sh <root_path>
+
+# Prepare backgrounds from weather datasets
+python scripts/pre_processings/prepare_backgrounds.py <root_paths> <output_path> --dataset-names <root_path_names> --max-samples <max_samples_per_label>
 ```
 
 ### Validation and Post-Processing
@@ -68,7 +74,7 @@ bash scripts/datasets/prepare_image2weather.sh <root_path>
 python scripts/post_processings/validate_coco_dataset.py <dataset_root>
 
 # Post-process generated data
-python scripts/post_processings/post_process.py
+python scripts/post_processings/post_process.py <root_path> --val-ratio <val_subset_ratio, e.g. 0.3333> 
 ```
 
 ## Architecture Overview
@@ -90,8 +96,9 @@ python scripts/post_processings/post_process.py
 ### Data Flow
 1. **Background Preparation**: Extract backgrounds from real-world datasets (nuScenes, Image2Weather, etc.)
 2. **UAV Generation**: Generate 3D UAV samples with randomized properties using Blender
-3. **Weather Transfer**: Apply weather stylization using diffusion models and ControlNet
-4. **Post-Processing**: Convert to COCO format, validate annotations, combine datasets
+3. **Weather Transfer**: Deprecated. Apply weather stylization using diffusion models and ControlNet
+4. **Image Harmonization**: Apply image harmonization using Adobe PIH (not in current repo)
+5. **Post-Processing**: Convert to COCO format, validate annotations, combine datasets
 
 ### Key Modules
 - **`uav_data_generation.blender`**: Core 3D generation logic and Blender integration
@@ -103,7 +110,7 @@ python scripts/post_processings/post_process.py
   - `coco.py` - COCO format annotation writer
   - `utils/` - Geometry, material, and mesh utilities
 - **`uav_data_generation.datasets`**: Deprecated
-- **`uav_data_generation.utils`**: Common utilities (e.g. dataset, io, and bbox...)
+- **`uav_data_generation.utils`**: Common utilities (e.g. dataset, io, etc.)
 
 ### Key Scripts
 - **`scripts/blender/`**: Generation entry points and demos
@@ -152,5 +159,5 @@ The project operates in two Python environments:
 ### Checkpoint and Resumability
 Generation supports checkpointing via `checkpoint.py`:
 - Automatically saves progress during long-running generations
-- `scripts/blender/generate_foregrounds.py` supports resuming from latest checkpoint in `--out-dir` using `--resume` or specific checkpoint using `--resume --checkpoint <checkpoint_path>`
 - Checkpoint files contain generation state and completed sample indices
+- `scripts/blender/generate_foregrounds.py` supports resuming from latest checkpoint in `--out-dir` using `--resume` or specific checkpoint using `--resume --checkpoint <checkpoint_path>`
