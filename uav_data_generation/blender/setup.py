@@ -27,10 +27,10 @@ def setup(config: BaseConfig, device_type: str, devices: list[int]):
         bpy.context.scene.cycles.use_denoising = True
         bpy.context.view_layer.cycles.use_denoising = True
         bpy.context.scene.cycles.denoiser = "OPENIMAGEDENOISE"
-        bpy.context.scene.cycles.denoising_input_passes = "RGB_ALBEDO_NORMAL"
         bpy.context.scene.cycles.denoising_prefilter = "ACCURATE"
     else:
         bproc.renderer.set_denoiser(config.render_denoiser)
+    bpy.context.scene.cycles.denoising_input_passes = "RGB_ALBEDO_NORMAL"
 
     # setup scene settings
     bpy.context.scene.render.fps = config.fps
