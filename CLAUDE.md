@@ -148,5 +148,5 @@ The project operates in two Python environments:
 ### Checkpoint and Resumability
 Generation supports checkpointing via `checkpoint.py`:
 - Automatically saves progress during long-running generations
-- `scripts/blender/generate_foregrounds.py` supports resuming from any checkpoint using `--resume --checkpoint <checkpoint_path>`
+- `scripts/blender/generate_foregrounds.py` supports resuming from latest checkpoint in `--out-dir` using `--resume` or specific checkpoint using `--resume --checkpoint <checkpoint_path>`
 - Checkpoint files contain generation state and completed sample indices
