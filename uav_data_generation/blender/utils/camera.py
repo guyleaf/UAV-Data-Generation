@@ -14,9 +14,7 @@ def is_vertex_in_camera_view(vertex: Union[np.ndarray, Vector]) -> bool:
         vertex = Vector(vertex)
 
     camera = bpy.context.scene.camera
-    vertex_in_camera_view = world_to_camera_view(
-        bpy.context.scene, camera, Vector(vertex)
-    )
+    vertex_in_camera_view = world_to_camera_view(bpy.context.scene, camera, vertex)
     return (
         0 <= vertex_in_camera_view.x <= 1
         and 0 <= vertex_in_camera_view.y <= 1
@@ -24,10 +22,13 @@ def is_vertex_in_camera_view(vertex: Union[np.ndarray, Vector]) -> bool:
     )
 
 
+def is_vertices_in_camera_view(vertices: Union[np.ndarray, list[Vector]]) -> bool:
+    return all(map(is_vertex_in_camera_view, vertices))
+
+
 def are_all_meshes_in_camera_view(
     meshes: list[MeshObject], frames: list[Union[int, tuple[int, float]]]
 ):
-    result = True
     for frame in frames:
         if isinstance(frame, tuple):
             frame, subframe = frame
@@ -35,7 +36,7 @@ def are_all_meshes_in_camera_view(
             frame, subframe = frame, 0
 
         with Frame(frame, subframe=subframe):
-            vertices = [mesh.get_bound_box() for mesh in meshes]
-            vertices = np.concatenate(vertices, axis=0)
-        result = result and all(map(is_vertex_in_camera_view, vertices))
-    return result
+            for mesh in meshes:
+                if not is_vertices_in_camera_view(mesh.get_bound_box()):
+                    return False
+    return True
