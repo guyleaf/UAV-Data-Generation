@@ -30,9 +30,6 @@ def translate_axis(obj: Union[Entity, bpy.types.Object], axis: str, amount: floa
     # translate location
     obj.location += translation_vector
 
-    # update the location immediately
-    bpy.context.view_layer.update()
-
 
 def rand_rotation_euler(
     x_range: tuple[int, int] = (0, 0),
