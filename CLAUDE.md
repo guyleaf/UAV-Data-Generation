@@ -102,6 +102,10 @@ python scripts/post_processings/post_process.py
   - `checkpoint.py` - Progress saving/resuming
   - `coco.py` - COCO format annotation writer
   - `utils/` - Geometry, material, and mesh utilities
+- **`uav_data_generation.datasets`**: Deprecated
+- **`uav_data_generation.utils`**: Common utilities (e.g. dataset, io, and bbox...)
+
+### Key Scripts
 - **`scripts/blender/`**: Generation entry points and demos
 - **`scripts/datasets/`**: Dataset preparation and conversion utilities
 - **`scripts/pre_processings/`**: Background and data preprocessing
