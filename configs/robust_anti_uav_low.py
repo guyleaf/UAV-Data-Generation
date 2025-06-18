@@ -29,6 +29,7 @@ class Config(BaseConfig):
 
     render_max_samples: int = 512
     motion_blur: bool = False
+    render_denoiser: str = "OPTIX"
 
     # control levels of all subdivision modifiers
     # our models are using level 1.
