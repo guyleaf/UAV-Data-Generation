@@ -26,7 +26,8 @@ runtime = [
     "bpy ~= 3.5.0",
     # after 2.8.0, we need to upgrade blender from 3.5.1 to 4.2.1
     "blenderproc ~= 2.7.2",
-    "nuscenes-devkit"
+    "nuscenes-devkit",
+    "mpi4py < 5"
 ]
 dev = [
     "uav_data_generation[runtime]",
