@@ -1,0 +1,4 @@
+[submodule "3rdparty/PIH"]
+	path = 3rdparty/PIH
+	url = https://github.com/guyleaf/PIH.git
+	branch = uav_dataset
