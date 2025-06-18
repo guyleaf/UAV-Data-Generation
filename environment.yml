@@ -1,15 +1,10 @@
 name: uav_data_generation
 channels:
-  - pytorch
-  - nvidia
   - conda-forge
   - defaults
 dependencies:
   - python=3.10
   - pip
-  - pytorch=2.4
-  - torchvision=0.19
-  - pytorch-cuda=12.1
-  - opencv<5
   - pip:
+      - --extra-index-url https://download.pytorch.org/whl/cu121
       - -e .[dev]
