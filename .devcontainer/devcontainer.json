@@ -1,0 +1,36 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/python
+{
+  "name": "Python 3",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "mounts": [
+    "source=${devcontainerId}-persistence,target=/persistence,type=volume",
+    "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.config/gh,target=/home/vscode/.config/gh,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/data,target=/data,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/work,target=/work,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/archive,target=/archive,type=bind,consistency=cached"
+  ],
+  "runArgs": ["--runtime=nvidia", "--gpus", "\"device=0,1,2,3\"", "--shm-size=1g"],
+
+  // Use 'forwardPorts' to make a list of ports inside the container available locally.
+  // "forwardPorts": [],
+
+  // Use 'postCreateCommand' to run commands after the container is created.
+  "postCreateCommand": "rm -rf .venv && ./scripts/setup_venv.sh",
+
+  // Configure tool-specific properties.
+  // "customizations": {},
+
+  // Must set these settings below if using rootless docker
+  "remoteUser": "root",
+  "containerEnv": {
+    "OMPI_ALLOW_RUN_AS_ROOT": "1",
+    "OMPI_ALLOW_RUN_AS_ROOT_CONFIRM": "1"
+  }
+}
