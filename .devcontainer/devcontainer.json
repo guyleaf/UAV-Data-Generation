@@ -10,8 +10,9 @@
   },
   "mounts": [
     "source=${devcontainerId}-persistence,target=/persistence,type=volume",
-    "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached",
-    "source=${localEnv:HOME}/.config/gh,target=/home/vscode/.config/gh,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.ssh,target=/root/.ssh,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.config/gh,target=/root/.config/gh,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.gitconfig,target=/root/.gitconfig,type=bind,consistency=cached",
     "source=${localEnv:HOME}/data,target=/data,type=bind,consistency=cached",
     "source=${localEnv:HOME}/work,target=/work,type=bind,consistency=cached",
     "source=${localEnv:HOME}/archive,target=/archive,type=bind,consistency=cached"
