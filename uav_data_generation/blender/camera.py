@@ -53,5 +53,6 @@ def align_camera_pose(
         print(f"[Adaptive alignment] Retrying to move backward... {z_offset:.3f}m")
 
     # set the camera pose
-    bproc.camera.add_camera_pose(camera.matrix_world, frame=frame)
+    matrix_world = bproc.camera.get_camera_pose()
+    bproc.camera.add_camera_pose(matrix_world, frame=frame)
     return z_offset

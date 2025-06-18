@@ -1,7 +1,6 @@
 import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the top due to the check of blenderproc
 import random
 
-import bpy
 from blenderproc.python.types.EntityUtility import Entity
 from blenderproc.python.types.MaterialUtility import Material
 
@@ -22,8 +21,6 @@ def randomize_drone_geometry(
     # randomly sample an euler angle
     euler = rand_rotation_euler(x_range, y_range, z_range)
     model.set_rotation_euler(euler, frame=frame)
-
-    bpy.context.view_layer.update()
 
 
 def randomize_drone_materials(

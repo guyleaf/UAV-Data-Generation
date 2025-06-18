@@ -481,3 +481,29 @@ if __name__ == "__main__":
         **args,
         checkpoint=ckpt,
     )
+    # with cProfile.Profile() as pr:
+    #     orig_handler = signal.getsignal(signal.SIGTERM)
+
+    #     # Listen for SIGTERM signal, so we can properly clean up and terminate the child process
+    #     def handle_sigterm(_signum, _frame):
+    #         print("Catching SIGTERM")
+    #         pr.dump_stats(
+    #             os.path.expanduser("~/git/UAV-Data-Generation/cprofile_test.prof")
+    #         )
+    #         print("Catched SIGTERM")
+    #         signal.signal(signal.SIGTERM, orig_handler)
+    #         os.kill(os.getpid(), signal.SIGTERM)
+
+    #     signal.signal(signal.SIGTERM, handle_sigterm)
+
+    #     try:
+    #         generate_foregrounds(
+    #             cfg,
+    #             **cfg.to_dict(),
+    #             **args,
+    #             checkpoint=ckpt,
+    #         )
+    #     finally:
+    #         pr.dump_stats(
+    #             os.path.expanduser("~/git/UAV-Data-Generation/cprofile_test.prof")
+    #         )
