@@ -22,7 +22,7 @@
     },
     {
       "name": "PIH",
-      "path": "../PIH"
+      "path": "./3rdparty/PIH"
     },
   ],
   "settings": {
