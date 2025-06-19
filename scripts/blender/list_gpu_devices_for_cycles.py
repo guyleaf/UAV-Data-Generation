@@ -1,10 +1,12 @@
 import blenderproc as bproc  # noqa:F401, isort:skip, this should be at the top due to the check of blenderproc
 
 import bpy
+from uav_data_generation.logging import get_logger
 
 if __name__ == "__main__":
     desired_gpu_device_type = ["OPTIX", "CUDA", "HIP"]
 
+    logger = get_logger()
     preferences = bpy.context.preferences.addons["cycles"].preferences
 
     for device_type in desired_gpu_device_type:
@@ -12,7 +14,6 @@ if __name__ == "__main__":
         if len(devices) == 0:
             continue
 
-        print()
-        print("Found device type:", device_type)
+        logger.info(f"\nFound device type: {device_type}")
         for i, device in enumerate(devices):
-            print(f"{i}. {device.name} of type {device.type}.")
+            logger.info(f"{i}. {device.name} of type {device.type}.")
