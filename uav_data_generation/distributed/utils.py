@@ -1,12 +1,15 @@
 # References from https://github.com/open-mmlab/mmengine/blob/main/mmengine/dist/utils.py
-
 import functools
-from typing import Callable, Optional
 import sys
+from typing import Callable, Optional
+
 from mpi4py import MPI
 
 _COMM_WORLD = MPI.COMM_WORLD
 _COMM_NODE: Optional[MPI.Intracomm] = None
+
+# intialize MPI and node communicator
+_INITIALIZED = False
 
 
 def is_distributed() -> bool:
@@ -14,26 +17,34 @@ def is_distributed() -> bool:
     return MPI.Is_initialized()
 
 
-def _mpi_abort_excepthook(type, exception, traceback):
-    if is_distributed():
-        _COMM_WORLD.Abort()
-    sys.__excepthook__(type, exception, traceback)
-
-
 def init_dist():
+    global _INITIALIZED, _COMM_NODE
+    if _INITIALIZED:
+        return
+
+    orig_excepthook = sys.excepthook
+
+    def _mpi_abort_excepthook(type, exception, traceback):
+        if is_distributed():
+            _COMM_WORLD.Abort()
+        orig_excepthook(type, exception, traceback)
+
     sys.excepthook = _mpi_abort_excepthook
+
     # the user may import MPI before calling. initializing twice will raise an error.
     if not MPI.Is_initialized():
         MPI.Init()
     rank = _COMM_WORLD.Get_rank()
 
     # split into communicators based on nodes
-    _COMM_NODE = _COMM_WORLD.Split_type(
-        MPI.COMM_TYPE_RESOURCE_GUIDED, key=rank)
+    _COMM_NODE = _COMM_WORLD.Split_type(MPI.COMM_TYPE_RESOURCE_GUIDED, key=rank)
 
     assert _COMM_NODE is not None, "Cannot create a node intra-comm.."
-    assert isinstance(
-        _COMM_NODE, MPI.Intracomm), "The node comm. should be an intra-comm.."
+    assert isinstance(_COMM_NODE, MPI.Intracomm), (
+        "The node comm. should be an intra-comm.."
+    )
+
+    _INITIALIZED = True
 
 
 def get_world_comm() -> Optional[MPI.Intracomm]:
