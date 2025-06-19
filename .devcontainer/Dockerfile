@@ -25,7 +25,7 @@ RUN sed -i -e "s/http:\/\/deb\.debian\.org\/debian/http:\/\/debian\.csie\.ntu\.e
 
 RUN apt-get update && apt-get -y upgrade \
     && apt-get -y install --no-install-recommends man manpages \
-    && apt-get -y install --no-install-recommends git-lfs openmpi-bin openmpi-common openmpi-doc \
+    && apt-get -y install --no-install-recommends git-lfs openmpi-bin openmpi-common openmpi-doc libopenmpi-dev \
     && apt-get -y install libxxf86vm1 libx11-6 libxi6 libxrandr2 libxcursor1 libgl1 libxinerama1 libxkbcommon0 libsm6 \
     && apt-get -y install --no-install-recommends tmux \
     && apt-get -y install --no-install-recommends --reinstall bash-completion \
