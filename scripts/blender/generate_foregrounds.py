@@ -2,6 +2,7 @@ import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the to
 
 import json
 import shutil
+from functools import partial
 
 import bpy  # noqa: F401 # isort:skip
 import argparse
@@ -17,7 +18,6 @@ from blenderproc.python.types.MaterialUtility import Material
 from blenderproc.python.types.MeshObjectUtility import MeshObject
 from mathutils import Euler, Vector
 from rich import print
-
 from uav_data_generation.blender import Checkpoint, COCOWriter
 from uav_data_generation.blender.camera import align_camera_pose
 from uav_data_generation.blender.config import AREA_RANGES, BaseConfig
@@ -36,6 +36,7 @@ from uav_data_generation.blender.utils.utils import (
     reset_keyframes,
 )
 from uav_data_generation.utils.io import collect_images
+from uav_data_generation.utils.profiling import profile
 
 
 def parse_args():
@@ -81,6 +82,18 @@ def parse_args():
         type=int,
         nargs="+",
         help="The GPU device ids for rendering. You can check the id by executing list_gpu_devices.py",
+    )
+    parser.add_argument(
+        "--profile",
+        default=True,
+        action=argparse.BooleanOptionalAction,
+        help="Enable the profiling.",
+    )
+    parser.add_argument(
+        "--profile-out-file",
+        type=str,
+        default="./cprofile.prof",
+        help="Enable the profiling.",
     )
     args = parser.parse_args()
 
@@ -475,35 +488,8 @@ if __name__ == "__main__":
     os.environ["BLENDER_PROC_RANDOM_SEED"] = str(seed)
 
     # TODO: refactor to use class
-    generate_foregrounds(
-        cfg,
-        **cfg.to_dict(),
-        **args,
-        checkpoint=ckpt,
-    )
-    # with cProfile.Profile() as pr:
-    #     orig_handler = signal.getsignal(signal.SIGTERM)
-
-    #     # Listen for SIGTERM signal, so we can properly clean up and terminate the child process
-    #     def handle_sigterm(_signum, _frame):
-    #         print("Catching SIGTERM")
-    #         pr.dump_stats(
-    #             os.path.expanduser("~/git/UAV-Data-Generation/cprofile_test.prof")
-    #         )
-    #         print("Catched SIGTERM")
-    #         signal.signal(signal.SIGTERM, orig_handler)
-    #         os.kill(os.getpid(), signal.SIGTERM)
-
-    #     signal.signal(signal.SIGTERM, handle_sigterm)
-
-    #     try:
-    #         generate_foregrounds(
-    #             cfg,
-    #             **cfg.to_dict(),
-    #             **args,
-    #             checkpoint=ckpt,
-    #         )
-    #     finally:
-    #         pr.dump_stats(
-    #             os.path.expanduser("~/git/UAV-Data-Generation/cprofile_test.prof")
-    #         )
+    func = partial(generate_foregrounds, cfg, **cfg.to_dict(), **args, checkpoint=ckpt)
+    if args.profile:
+        profile(func, out_file=args.profile_out_file)
+    else:
+        func()
