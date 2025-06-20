@@ -70,15 +70,20 @@ def notify(env_file: str = ".env", task_name: Optional[str] = None) -> Callable:
             logger = logging.get_logger()
             logger.info(":white_check_mark: Notification is enabled!")
 
+            is_failed = False
             begin = time.time()
             try:
                 return func(*args, **kwargs)
+            except:
+                is_failed = True
+                raise
             finally:
                 delta = time.gmtime(time.time() - begin)
                 ftime = time.strftime("%H:%M:%S", delta)
 
                 # prepare content
-                content = f"is finished after {ftime}."
+                state = "unsuccessfully" if is_failed else "successfully"
+                content = f"is executed {state} after {ftime}."
                 nonlocal task_name
                 if task_name is None:
                     task_name = f"{func.__name__}() in {__file__}"
