@@ -2,7 +2,9 @@ import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the to
 
 import json
 import shutil
+import time
 from functools import partial
+from pathlib import Path
 
 import bpy  # noqa: F401 # isort:skip
 import argparse
@@ -10,14 +12,14 @@ import os
 import random
 from math import radians, sqrt
 from operator import itemgetter
-from typing import Optional
+from typing import Optional, Union
 
 import PIL.Image as Image
 from blenderproc.python.types.EntityUtility import Entity
 from blenderproc.python.types.MaterialUtility import Material
 from blenderproc.python.types.MeshObjectUtility import MeshObject
+from blenderproc.python.utility.Utility import stdout_redirected
 from mathutils import Euler, Vector
-from rich import print
 from uav_data_generation.blender import Checkpoint, COCOWriter
 from uav_data_generation.blender.camera import align_camera_pose
 from uav_data_generation.blender.config import AREA_RANGES, BaseConfig
@@ -35,7 +37,15 @@ from uav_data_generation.blender.utils.utils import (
     get_cp,
     reset_keyframes,
 )
-from uav_data_generation.utils.io import collect_images
+from uav_data_generation.data.datasets import ImageFolder
+from uav_data_generation.distributed import (
+    get_local_rank,
+    get_rank,
+    init_dist,
+    is_distributed,
+    is_main_process,
+)
+from uav_data_generation.logging import get_logger, raise_error
 from uav_data_generation.utils.profiling import profile
 
 
@@ -84,8 +94,14 @@ def parse_args():
         help="The GPU device ids for rendering. You can check the id by executing list_gpu_devices.py",
     )
     parser.add_argument(
+        "--distributed",
+        default=False,
+        action=argparse.BooleanOptionalAction,
+        help="Enable the distributed mode.",
+    )
+    parser.add_argument(
         "--profile",
-        default=True,
+        default=False,
         action=argparse.BooleanOptionalAction,
         help="Enable the profiling.",
     )
@@ -158,7 +174,17 @@ def generate_uav_samples(
 
         # render the whole pipeline
         bproc.utility.set_keyframe_render_interval(frame_start=frame)
-        image = bproc.renderer.render()["colors"][0]
+        if is_distributed():
+            begin = time.time()
+            # make blender stdout silent
+            with stdout_redirected():
+                begin = time.time()
+                result = bproc.renderer.render()
+                end = time.time()
+            logger.info(f"Finished rendering after {end - begin:.3f} seconds")
+        else:
+            result = bproc.renderer.render()
+        image = result["colors"][0]
 
         # restore UAV model status
         for uav_mesh, original_material_slots in zip(
@@ -222,8 +248,10 @@ def sample_uav_size(
 
         return scaled_uav_size
 
-    raise RuntimeError(
-        f"Cannot find an ideal area to fit the ranges. UAV: {uav_size}, Image: {image_size}."
+    raise_error(
+        RuntimeError(
+            f"Cannot find an ideal area to fit the ranges. UAV: {uav_size}, Image: {image_size}."
+        )
     )
 
 
@@ -234,6 +262,7 @@ def sample_uav_location(
     min_uav_image_iof: float = 1,
     max_uavs_iof: float = 0,
 ) -> Optional[tuple[int, int]]:
+    logger = get_logger()
     half_w, half_h = image_size[0] // 2, image_size[1] // 2
     start_w, start_h = -half_w, -half_h
     end_w, end_h = image_size[0] + half_w, image_size[1] + half_h
@@ -256,15 +285,29 @@ def sample_uav_location(
         if (iofs1 <= max_uavs_iof).all() and (iofs2 <= max_uavs_iof).all():
             return x, y
 
-    print(
-        f"Warning! Cannot find an ideal location to fit the maximum IoF {max_uavs_iof}."
+    logger.warning(
+        f"[bold yellow]Warning! Cannot find an ideal location to fit the maximum IoF {max_uavs_iof}."
     )
     return None
 
 
+def save_checkpoint(checkpoint: Checkpoint, out_file: Path, max_checkpoints: int):
+    checkpoint.save_pickle(out_file)
+
+    # remove oldest checkpoints
+    checkpoint_files = out_file.parent.glob("*.pkl")
+    checkpoint_files = map(
+        lambda checkpoint_file: (checkpoint_file, os.path.getmtime(checkpoint_file)),
+        checkpoint_files,
+    )
+    checkpoint_files = sorted(checkpoint_files, key=itemgetter(1))
+    for checkpoint_file, mtime in checkpoint_files[:-max_checkpoints]:
+        os.remove(checkpoint_file)
+
+
 def generate_foregrounds(
     config: BaseConfig,
-    images_path: str,
+    images_path: Union[str, Path],
     x_range: tuple[int, int] = (-45, 45),
     y_range: tuple[int, int] = (-45, 45),
     z_range: tuple[int, int] = (0, 360),
@@ -280,7 +323,7 @@ def generate_foregrounds(
     adaptive_alignment: bool = True,
     alignment_z_offset: float = 0,
     alignment_z_step: float = 0.1,
-    out_dir: str = "outputs",
+    out_dir: Union[str, Path] = "outputs",
     device_type: str = "OPTIX",
     devices: list[int] = [0],
     checkpoint: Optional[Checkpoint] = None,
@@ -288,14 +331,16 @@ def generate_foregrounds(
     checkpoint_interval: int = 5,
     **kwargs,
 ):
+    logger = get_logger()
+    rank = get_rank()
     objs, uav_models = setup(config, device_type, devices)
     materials = collect_materials_by_cp()
 
-    # place the camera in front of the UAV model
-    camera = bpy.context.scene.camera
-    camera.location = Vector((0, -1, 0))
-    camera.rotation_euler = Euler((radians(90), 0, 0))
-    bpy.context.view_layer.update()
+    # prepare folders
+    out_dir = Path(out_dir)
+    checkpoints_dir = out_dir / "checkpoints" / f"rank_{rank}"
+    fg_images_dir = out_dir / "foregrounds"
+    annotations_dir = out_dir / "annotations"
 
     # prepare COCO writer
     if checkpoint is not None:
@@ -305,40 +350,36 @@ def generate_foregrounds(
         coco_writer = COCOWriter()
         category_id = coco_writer.add_category("drone", "UAV")
 
-    checkpoints_dir = os.path.join(out_dir, "checkpoints")
-    fg_images_dir = os.path.join(out_dir, "foregrounds")
-    annotations_dir = os.path.join(out_dir, "annotations")
-
-    # collect image informations
-    image_paths = collect_images(images_path)
+    # prepare dataset & validate the checkpoint
+    dataset = ImageFolder(images_path)
     if checkpoint is not None:
-        assert checkpoint.image_paths == image_paths, (
-            "Inconsistent images. The checkpoint may be not for this."
-        )
-        for image in coco_writer.images:
-            image_path = os.path.join(fg_images_dir, image["file_name"])
-            assert os.path.exists(image_path), (
-                f"The foreground image {image_path} is not Found."
-            )
+        if checkpoint.dataset != dataset:
+            raise_error(RuntimeError("The dataset is invalid."))
+        if not coco_writer.validate(fg_images_dir):
+            raise_error(RuntimeError("The COCO writer is invalid."))
+
+    # place the camera in front of the UAV model
+    camera = bpy.context.scene.camera
+    camera.location = Vector((0, -1, 0))
+    camera.rotation_euler = Euler((radians(90), 0, 0))
 
     # restore random state
     if checkpoint is not None:
         checkpoint.restore_random_states()
-        print("Restored the random states!")
+        logger.info(":white_check_mark: Restored the random states!")
 
     uav_models = list(uav_models.values())
     start_index = checkpoint.image_index + 1 if checkpoint is not None else 0
-    for image_index in range(start_index, len(image_paths)):
-        image_path = image_paths[image_index]
+    for image_index in range(start_index, len(dataset)):
+        background_image, image_path = dataset[image_index]
+
+        # create an foreground image with the same size as the image
+        foreground_image = Image.new("RGBA", background_image.size)
+        background_image.close()
 
         # determine how many samples should be generated
         num_samples = random.randint(*sample_range)
         selected_models = random.choices(uav_models, k=num_samples)
-
-        # create an foreground image with the same size as the image
-        background_image = Image.open(image_path)
-        foreground_image = Image.new("RGBA", background_image.size)
-        background_image.close()
 
         uav_images: list[Image.Image] = []
         uav_bboxes: list[tuple[int, int, int, int]] = []
@@ -378,7 +419,7 @@ def generate_foregrounds(
                 max_uavs_iof=max_uavs_iof,
             )
             if uav_location is None:
-                print("Skipping...")
+                logger.info("Skipping...")
                 continue
 
             # scale the UAV
@@ -388,7 +429,7 @@ def generate_foregrounds(
             uav_images.append(uav_image)
             uav_bboxes.append((*uav_location, *uav_image.size))
 
-        print(f"Success: {len(uav_bboxes)} of {num_samples}.")
+        logger.info(f"Success: {len(uav_bboxes)} of {num_samples}.")
 
         ## Post-processing
         # paste UAVs starting from the most distant UAV
@@ -402,49 +443,78 @@ def generate_foregrounds(
             uav_bboxes[i] = find_overlap_bbox(bbox, (0, 0, *foreground_image.size))
 
         # get output path
-        rel_path = os.path.relpath(os.path.dirname(image_path), images_path)
-        image_name, _ = os.path.splitext(os.path.basename(image_path))
-        out_file = os.path.join(rel_path, f"{image_name}.png")
+        rel_path = image_path.relative_to(images_path)
+        out_file = rel_path.with_suffix(".png")
 
         # add image info to COCOWriter
-        image_id = coco_writer.add_image(out_file, *foreground_image.size)
+        image_id = coco_writer.add_image(out_file.as_posix(), *foreground_image.size)
         coco_writer.add_annotations(image_id, category_id, uav_bboxes)
 
         # save the foreground image
-        out_file = os.path.join(fg_images_dir, out_file)
-        os.makedirs(os.path.dirname(out_file), exist_ok=True)
+        out_file = fg_images_dir / out_file
+        out_file.parent.mkdir(parents=True, exist_ok=True)
         foreground_image.save(out_file)
-
-        print(f"Saved the foreground image as {out_file}")
+        logger.info(f"[bold bright_green]Saved the foreground image as {out_file}.")
 
         # save the checkpoint every checkpoint_interval
         if (image_index + 1) % checkpoint_interval == 0:
-            # ensure the COCO writer is consistent.
-            assert image_index + 1 == len(coco_writer.images)
-            checkpoint = Checkpoint(image_index, image_paths, coco_writer)
-            checkpoint.save_pickle(
-                os.path.join(checkpoints_dir, f"blender_state_{image_index + 1}.pkl")
-            )
+            checkpoint = Checkpoint(rank, image_index, dataset, coco_writer)
+            out_file = checkpoints_dir / f"blender_state_{image_index + 1}.pkl"
+            save_checkpoint(checkpoint, out_file, max_checkpoints)
 
-            # remove oldest checkpoints
-            checkpoint_files = [
-                os.path.join(checkpoints_dir, checkpoint_file)
-                for checkpoint_file in os.listdir(checkpoints_dir)
-            ]
-            checkpoint_files = [
-                (checkpoint_file, os.path.getmtime(checkpoint_file))
-                for checkpoint_file in checkpoint_files
-            ]
-            checkpoint_files = sorted(checkpoint_files, key=itemgetter(1))
-            for checkpoint_file, mtime in checkpoint_files[:-max_checkpoints]:
-                os.remove(checkpoint_file)
-
-    assert len(image_paths) == len(coco_writer.images)
+    if len(dataset) != len(coco_writer.images):
+        raise_error(RuntimeError("The COCO annotations are corrupted."))
 
     # save annotations in COCO format
     os.makedirs(annotations_dir, exist_ok=True)
     out_file = os.path.join(annotations_dir, "foreground.json")
     coco_writer.export(out_file)
+
+
+def setup_dist(cfg: BaseConfig, args: argparse.Namespace):
+    if args.distributed:
+        # initialize the MPI
+        init_dist()
+    del args.distributed
+
+    rank = get_rank()
+    local_rank = get_local_rank()
+    logger = get_logger()
+
+    if args.out_dir is not None:
+        cfg.out_dir = os.path.expanduser(args.out_dir)
+
+    # resume from the checkpoint
+    ckpt = None
+    if args.resume:
+        if args.checkpoint is None:
+            ckpt_root_path = os.path.join(cfg.out_dir, "checkpoints", f"rank_{rank}")
+            ckpt, args.checkpoint = Checkpoint.from_latest(ckpt_root_path)
+        else:
+            ckpt = Checkpoint.from_pickle(args.checkpoint)
+        if ckpt.rank != rank:
+            raise_error(RuntimeError("The checkpoint is not for this process."))
+        logger.info(
+            f":white_check_mark: Resumed from the last checkpoint, {args.checkpoint}."
+        )
+
+    if is_main_process():
+        # save args and config
+        with open(os.path.join(cfg.out_dir, "args.json"), "w") as f:
+            json.dump(vars(args), f, indent=4)
+        shutil.copy2(args.config_path, os.path.join(cfg.out_dir, "config.py"))
+    del args.config_path
+
+    # seeding with rank offset
+    args.seed = args.seed + rank
+
+    # allocate GPU devices based on rank
+    # ex. rank 3 with [0, 1] => [3 * num_devices, 3 * num_devices + 1]
+    num_devices = len(args.devices)
+    base_offset = local_rank * num_devices
+    args.devices = [base_offset + device for device in args.devices]
+
+    return ckpt
 
 
 if __name__ == "__main__":
@@ -456,30 +526,13 @@ if __name__ == "__main__":
 
     args = parse_args()
     cfg = BaseConfig.from_file(args.config_path)
+    ckpt = setup_dist(cfg, args)
 
-    if args.out_dir is not None:
-        cfg.out_dir = os.path.expanduser(args.out_dir)
-
-    ckpt = None
-    if args.resume:
-        if args.checkpoint is None:
-            ckpt_root_path = os.path.join(cfg.out_dir, "checkpoints")
-            # use the latest checkpoint
-            args.checkpoint = sorted(os.listdir(ckpt_root_path))[-1]
-            args.checkpoint = os.path.join(ckpt_root_path, args.checkpoint)
-
-        ckpt = Checkpoint.from_pickle(args.checkpoint)
-        print(f"Resume from the last checkpoint, {args.checkpoint}.")
+    logger = get_logger()
 
     args = vars(args)
-    print()
-    print("Arguments:", args)
-    print(cfg)
-
-    # save args and config
-    with open(os.path.join(cfg.out_dir, "args.json"), "w") as f:
-        json.dump(args, f, indent=4)
-    shutil.copy2(args.pop("config_path"), os.path.join(cfg.out_dir, "config.py"))
+    logger.info(f"Arguments: {args}")
+    logger.info(cfg)
 
     args.pop("out_dir")
     args.pop("resume")
@@ -488,8 +541,10 @@ if __name__ == "__main__":
     os.environ["BLENDER_PROC_RANDOM_SEED"] = str(seed)
 
     # TODO: refactor to use class
+    use_profile = args.pop("profile")
+    profile_out_file = args.pop("profile_out_file")
     func = partial(generate_foregrounds, cfg, **cfg.to_dict(), **args, checkpoint=ckpt)
-    if args.profile:
-        profile(func, out_file=args.profile_out_file)
+    if use_profile and is_main_process():
+        profile(func, out_file=profile_out_file)
     else:
         func()
