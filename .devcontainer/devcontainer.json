@@ -32,6 +32,8 @@
   "remoteUser": "root",
   "containerEnv": {
     "OMPI_ALLOW_RUN_AS_ROOT": "1",
-    "OMPI_ALLOW_RUN_AS_ROOT_CONFIRM": "1"
+    "OMPI_ALLOW_RUN_AS_ROOT_CONFIRM": "1",
+    // Allow using OPTIX in container
+    "NVIDIA_DRIVER_CAPABILITIES": "graphics,compute,utility"
   }
 }
