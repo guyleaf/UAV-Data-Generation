@@ -371,7 +371,8 @@ def generate_foregrounds(
 
     uav_models = list(uav_models.values())
     start_index = checkpoint.image_index + 1 if checkpoint is not None else 0
-    for image_index in range(start_index, len(dataset)):
+    num_images = len(dataset)
+    for image_index in range(start_index, num_images):
         background_image, image_path = dataset[image_index]
 
         # create an foreground image with the same size as the image
@@ -455,7 +456,9 @@ def generate_foregrounds(
         out_file = fg_images_dir / out_file
         out_file.parent.mkdir(parents=True, exist_ok=True)
         foreground_image.save(out_file)
-        logger.info(f"[bold bright_green]Saved the foreground image as {out_file}.")
+        logger.info(
+            f"[{image_index + 1}/{num_images}] [bold bright_green]Saved the foreground image as {out_file}."
+        )
 
         # save the checkpoint every checkpoint_interval
         if (image_index + 1) % checkpoint_interval == 0:
