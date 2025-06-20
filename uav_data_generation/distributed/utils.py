@@ -5,6 +5,8 @@ from typing import Callable, Optional
 
 from mpi4py import MPI
 
+from .. import logging
+
 _COMM_WORLD = MPI.COMM_WORLD
 _COMM_NODE: Optional[MPI.Intracomm] = None
 
@@ -26,7 +28,12 @@ def init_dist():
 
     def _mpi_abort_excepthook(type, exception, traceback):
         if is_distributed():
-            _COMM_WORLD.Abort()
+            # NOTE: this is for final uncaught exception
+            # logging here may not send before abort
+            # you can use logging.raise_error instead to raise exception with logging
+            logger = logging.get_logger()
+            logger.exception(exception)
+            _COMM_WORLD.Abort(1)
         orig_excepthook(type, exception, traceback)
 
     sys.excepthook = _mpi_abort_excepthook
@@ -37,12 +44,11 @@ def init_dist():
     rank = _COMM_WORLD.Get_rank()
 
     # split into communicators based on nodes
-    _COMM_NODE = _COMM_WORLD.Split_type(MPI.COMM_TYPE_RESOURCE_GUIDED, key=rank)
-
-    assert _COMM_NODE is not None, "Cannot create a node intra-comm.."
-    assert isinstance(_COMM_NODE, MPI.Intracomm), (
-        "The node comm. should be an intra-comm.."
-    )
+    _COMM_NODE = _COMM_WORLD.Split_type(MPI.COMM_TYPE_SHARED, key=rank)
+    if _COMM_NODE == MPI.COMM_NULL:
+        logging.raise_error(RuntimeError("Cannot create a node intra-comm.."))
+    if not isinstance(_COMM_NODE, MPI.Intracomm):
+        logging.raise_error(RuntimeError("The node comm. should be an intra-comm.."))
 
     _INITIALIZED = True
 
@@ -91,7 +97,8 @@ def get_local_size() -> int:
         distributed environment, otherwise 1.
     """
     if is_distributed():
-        assert _COMM_NODE is not None, "You should call init_dist() first."
+        if _COMM_NODE is None:
+            logging.raise_error(RuntimeError("You should call init_dist() first."))
         return _COMM_NODE.Get_size()
     else:
         return 1
@@ -124,6 +131,10 @@ def get_rank(comm: Optional[MPI.Comm] = None) -> int:
         return 0
 
 
+def get_node_name() -> str:
+    return MPI.Get_processor_name()
+
+
 def get_local_rank() -> int:
     """Return the rank of current process in the current node.
 
@@ -132,7 +143,8 @@ def get_local_rank() -> int:
         distributed environment, otherwise 0
     """
     if is_distributed():
-        assert _COMM_NODE is not None, "You should call init_dist() first."
+        if _COMM_NODE is None:
+            logging.raise_error(RuntimeError("You should call init_dist() first."))
         return _COMM_NODE.Get_rank()
     else:
         return 0

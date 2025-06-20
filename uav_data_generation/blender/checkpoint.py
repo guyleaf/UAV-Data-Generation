@@ -1,9 +1,12 @@
 import os
 import pickle
 import random
+from pathlib import Path
+from typing import Union
 
 import numpy as np
 
+from ..data import Dataset
 from .coco import COCOWriter
 
 
@@ -11,14 +14,23 @@ class Checkpoint:
     random_state: tuple
     np_random_state: tuple
     image_index: int
-    image_paths: list[str]
+    dataset: Dataset
     coco_writer: COCOWriter
 
     def __init__(
-        self, image_index: int, image_paths: list[str], coco_writer: COCOWriter
+        self, rank: int, image_index: int, dataset: Dataset, coco_writer: COCOWriter
     ) -> None:
+        # ensure the state is consistent.
+        assert isinstance(rank, int) and rank >= 0
+        assert isinstance(dataset, Dataset)
+        assert isinstance(image_index, int) and 0 <= image_index < len(dataset)
+        assert isinstance(coco_writer, COCOWriter) and image_index + 1 == len(
+            coco_writer.images
+        )
+
+        self.rank = rank
         self.image_index = image_index
-        self.image_paths = image_paths
+        self.dataset = dataset
         self.coco_writer = coco_writer
         self.save_random_states()
 
@@ -37,8 +49,16 @@ class Checkpoint:
         assert isinstance(instance, Checkpoint)
         return instance
 
-    def save_pickle(self, path: str):
-        assert os.path.splitext(path)[1] == ".pkl"
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+    @classmethod
+    def from_latest(cls, root_path: str) -> tuple["Checkpoint", str]:
+        path = sorted(os.listdir(root_path))[-1]
+        path = os.path.join(root_path, path)
+        return cls.from_pickle(path), path
+
+    def save_pickle(self, path: Union[str, Path]):
+        if isinstance(path, str):
+            path = Path(path)
+        assert path.suffix == ".pkl"
+        path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "wb") as f:
-            pickle.dump(self, f, pickle.HIGHEST_PROTOCOL)
+            pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)

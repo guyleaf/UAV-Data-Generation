@@ -1,7 +1,10 @@
+from ..distributed import is_distributed, get_world_comm, get_rank  # noqa: F401 # isort:skip, this should be at the top
+
 import datetime
 import json
 import os
-from typing import Optional
+from pathlib import Path
+from typing import Optional, Union
 
 
 class COCOWriter:
@@ -108,9 +111,9 @@ class COCOWriter:
         bboxes: list[tuple[int, int, int, int]],
     ) -> list[int]:
         assert image_id < self.image_counter, f"Unknown image_id {image_id}"
-        assert any(
-            category["id"] == category_id for category in self.categories
-        ), f"Unknown category {category_id}"
+        assert any(category["id"] == category_id for category in self.categories), (
+            f"Unknown category {category_id}"
+        )
 
         image = self.images[image_id - 1]
         width = image["width"]
@@ -128,8 +131,49 @@ class COCOWriter:
             self.annotation_counter += 1
         return ids
 
-    def export(self, path: str):
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+    def _gather_coco(self):
+        comm = get_world_comm()
+        rank = get_rank(comm)
+
+        # gather statistics for each rank
+        statistics: list[tuple[int, int]]
+        statistics = comm.allgather((len(self.images), len(self.annotations)))
+
+        # calculate the rank offset for id
+        image_offset = anno_offset = 0
+        for num_images, num_annos in statistics[:rank]:
+            image_offset += num_images
+            anno_offset += num_annos
+
+        # add the offset to id
+        for image in self.images:
+            image["id"] += image_offset
+        for annotation in self.annotations:
+            annotation["id"] += anno_offset
+            annotation["image_id"] += image_offset
+
+        data: list[tuple[list[dict], list[dict]]]
+        data = comm.gather((self.images, self.annotations))
+
+        images = []
+        annotations = []
+        for rank_images, rank_annotations in data:
+            images.extend(rank_images)
+            annotations.extend(rank_annotations)
+        return images, annotations
+
+    def export(self, path: Union[str, Path]):
+        if is_distributed():
+            images, annotations = self._gather_coco()
+        else:
+            images, annotations = self.images, self.annotations
+
+        self.coco["images"] = images
+        self.coco["annotations"] = annotations
+
+        if isinstance(path, str):
+            path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(self.coco, f)
 
@@ -138,3 +182,11 @@ class COCOWriter:
         self.annotation_counter = 1
         self.images.clear()
         self.annotations.clear()
+
+    def validate(self, root_path: Union[str, Path]):
+        """Check if all images exist."""
+        for image in self.images:
+            image_path = os.path.join(root_path, image["file_name"])
+            if not os.path.exists(image_path):
+                return False
+        return True

@@ -1,15 +1,16 @@
 import blenderproc as bproc  # noqa: F401 # isort:skip, this should be at the top due to the check of blenderproc
 
-import os
 from operator import methodcaller
 
 import bpy
 from blenderproc.api.types import Entity
 
+from ..logging import get_logger
 from .config import BaseConfig
 
 
 def setup(config: BaseConfig, device_type: str, devices: list[int]):
+    logger = get_logger()
     bproc.init()
 
     # set render device
@@ -51,7 +52,7 @@ def setup(config: BaseConfig, device_type: str, devices: list[int]):
 
     # light paths settings
     if config.use_light_preset:
-        print("Loading the light preset:", config.light_preset_path)
+        logger.info(f"Loading the light preset: {config.light_preset_path}")
         bpy.utils.execfile(config.light_preset_path)
     else:
         bpy.context.scene.cycles.caustics_reflective = config.caustics_reflective
@@ -69,10 +70,10 @@ def setup(config: BaseConfig, device_type: str, devices: list[int]):
         )
 
     if config.motion_blur:
-        print("Enabling motion blur")
+        logger.info("Enabling motion blur")
         bproc.renderer.enable_motion_blur(motion_blur_length=0.5)
 
-    print("\nLoading the background:", os.path.basename(config.background_path))
+    logger.info(f"Loading the background: {config.background_path}")
     bproc.world.set_world_background_hdr_img(config.background_path)
 
     # note: only objects in the obj_types can be loaded
@@ -100,7 +101,7 @@ def setup(config: BaseConfig, device_type: str, devices: list[int]):
         uav_model_dict = {name: uav_model_dict[name] for name in config.models}
 
     assert len(uav_model_dict) > 0, "UAV model is not found."
-    print("\nFind", len(uav_model_dict), "UAV models")
+    logger.info(f"Find {len(uav_model_dict)} UAV models.")
 
     # hide all objects by default
     for model in entities:

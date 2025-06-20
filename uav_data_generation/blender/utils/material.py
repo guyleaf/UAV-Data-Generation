@@ -9,18 +9,20 @@ import idprop
 from blenderproc.python.types.EntityUtility import Entity
 from blenderproc.python.types.MeshObjectUtility import MeshObject
 
+from ...logging import get_logger
 from .utils import get_cp
 
 
 def collect_materials_by_cp(
     cp_name: str = "random_material", cp_value: bool = True
 ) -> list[bproc.types.Material]:
+    logger = get_logger()
     materials = bproc.material.collect_all()
     materials = bproc.filter.by_cp(
         materials, cp_name, cp_value, filtered_data_type=bproc.types.Material
     )
     materials.sort(key=methodcaller("get_name"))
-    print(f"Find {len(materials)} materials")
+    logger.info(f"Find {len(materials)} materials")
     return materials
 
 

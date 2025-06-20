@@ -5,6 +5,7 @@ import bpy  # noqa: F401 # isort:skip
 from blenderproc.python.types.EntityUtility import Entity
 from blenderproc.python.types.MeshObjectUtility import MeshObject
 
+from ..logging import get_logger
 from .frame import Frame
 from .utils.camera import are_all_meshes_in_camera_view
 from .utils.geometry import translate_axis
@@ -18,6 +19,7 @@ def align_camera_pose(
     alignment_z_offset: float = 0,
     alignment_z_step: float = 0.1,
 ):
+    logger = get_logger()
     camera = bpy.context.scene.camera
 
     # select the current model
@@ -50,7 +52,9 @@ def align_camera_pose(
         while not are_all_meshes_in_camera_view(uav_meshes, frames):
             z_offset += alignment_z_step
             translate_axis(camera, "Z", alignment_z_step)
-        print(f"[Adaptive alignment] Retrying to move backward... {z_offset:.3f}m")
+        logger.info(
+            f"[Adaptive alignment] Retrying to move backward... {z_offset:.3f}m"
+        )
 
     # set the camera pose
     matrix_world = bproc.camera.get_camera_pose()
