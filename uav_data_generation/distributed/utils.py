@@ -1,6 +1,5 @@
 # References from https://github.com/open-mmlab/mmengine/blob/main/mmengine/dist/utils.py
 import functools
-import sys
 from typing import Callable, Optional
 
 from mpi4py import MPI
@@ -23,20 +22,6 @@ def init_dist():
     global _INITIALIZED, _COMM_NODE
     if _INITIALIZED:
         return
-
-    orig_excepthook = sys.excepthook
-
-    def _mpi_abort_excepthook(type, exception, traceback):
-        if is_distributed():
-            # NOTE: this is for final uncaught exception
-            # logging here may not send before abort
-            # you can use logging.raise_error instead to raise exception with logging
-            logger = logging.get_logger()
-            logger.exception(exception)
-            _COMM_WORLD.Abort(1)
-        orig_excepthook(type, exception, traceback)
-
-    sys.excepthook = _mpi_abort_excepthook
 
     # the user may import MPI before calling. initializing twice will raise an error.
     if not MPI.Is_initialized():
