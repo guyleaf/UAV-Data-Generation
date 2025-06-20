@@ -43,17 +43,21 @@ class Checkpoint:
         np.random.set_state(self.np_random_state)
 
     @classmethod
-    def from_pickle(cls, path: str) -> "Checkpoint":
+    def from_pickle(cls, path: Union[str, Path]) -> "Checkpoint":
         with open(path, "rb") as f:
             instance = pickle.load(f)
         assert isinstance(instance, Checkpoint)
         return instance
 
     @classmethod
-    def from_latest(cls, root_path: str) -> tuple["Checkpoint", str]:
-        path = sorted(os.listdir(root_path))[-1]
-        path = os.path.join(root_path, path)
-        return cls.from_pickle(path), path
+    def from_latest(cls, root_path: Union[str, Path]) -> tuple["Checkpoint", str]:
+        if isinstance(root_path, str):
+            root_path = Path(root_path)
+        checkpoint_files = root_path.glob("*.pkl")
+        latest_checkpoint_file = max(
+            checkpoint_files, key=lambda x: os.path.getmtime(x)
+        )
+        return cls.from_pickle(latest_checkpoint_file), str(latest_checkpoint_file)
 
     def save_pickle(self, path: Union[str, Path]):
         if isinstance(path, str):
