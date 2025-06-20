@@ -46,6 +46,7 @@ from uav_data_generation.distributed import (
     is_main_process,
 )
 from uav_data_generation.logging import get_logger, raise_error
+from uav_data_generation.utils.notification import notify
 from uav_data_generation.utils.profiling import profile
 
 
@@ -175,11 +176,10 @@ def generate_uav_samples(
         # render the whole pipeline
         bproc.utility.set_keyframe_render_interval(frame_start=frame)
         if is_distributed():
-            begin = time.time()
             # make blender stdout silent
             with stdout_redirected():
                 begin = time.time()
-                result = bproc.renderer.render()
+                result = bproc.renderer.render(verbose=True)
                 end = time.time()
             logger.info(f"Finished rendering after {end - begin:.3f} seconds")
         else:
@@ -305,6 +305,7 @@ def save_checkpoint(checkpoint: Checkpoint, out_file: Path, max_checkpoints: int
         os.remove(checkpoint_file)
 
 
+@notify()
 def generate_foregrounds(
     config: BaseConfig,
     images_path: Union[str, Path],
