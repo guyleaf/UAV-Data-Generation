@@ -2,7 +2,7 @@ import functools
 import smtplib
 import time
 from email.message import EmailMessage
-from typing import Callable
+from typing import Callable, Optional
 
 import dotenv
 
@@ -49,17 +49,17 @@ def send_email(conn: smtplib.SMTP, content: str, env_vars: dict[str, str]):
     logger = logging.get_logger()
     try:
         conn.send_message(msg, from_addr=sender, to_addrs=receivers)
-        logger.info("[bold bright_green] Sended the notification successfully!...")
+        logger.info(":white_check_mark: The notification is sended!")
     except Exception as e:
         logger.exception(e)
 
 
-def notify(env_file: str = ".env") -> Callable:
+def notify(env_file: str = ".env", task_name: Optional[str] = None) -> Callable:
     def decorator(func: Callable) -> Callable:
         env_vars = _load_env(env_file)
         if env_vars is None:
             return func
-        if not bool(env_vars["ENABLE_NOTIFICATION"]):
+        if not bool(int(env_vars["ENABLE_NOTIFICATION"])):
             return func
 
         conn = setup_email(env_vars)
@@ -74,8 +74,15 @@ def notify(env_file: str = ".env") -> Callable:
             try:
                 return func(*args, **kwargs)
             finally:
-                ftime = time.strftime("%d:%H:%M:%S", time.gmtime(time.time() - begin))
-                content = f"{func.__name__} is finished after {ftime}."
+                delta = time.gmtime(time.time() - begin)
+                ftime = time.strftime("%H:%M:%S", delta)
+
+                # prepare content
+                content = f"is finished after {ftime}."
+                nonlocal task_name
+                if task_name is None:
+                    task_name = f"{func.__name__}() in {__file__}"
+                content = f"{task_name} {content}"
 
                 logger.info(f":white_check_mark: {content}")
                 send_email(conn, content, env_vars)
