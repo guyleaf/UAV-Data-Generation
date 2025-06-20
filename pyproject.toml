@@ -17,6 +17,8 @@ dependencies = [
     "pycocotools",
     "rich",
     "scikit-learn < 2",
+    "mpi4py < 5",
+    "python-dotenv",
 ]
 
 [project.optional-dependencies]
@@ -27,7 +29,6 @@ runtime = [
     # after 2.8.0, we need to upgrade blender from 3.5.1 to 4.2.1
     "blenderproc ~= 2.7.2",
     "nuscenes-devkit",
-    "mpi4py < 5"
 ]
 dev = [
     "uav_data_generation[runtime]",
@@ -52,7 +53,7 @@ dev = [
     "mkdocs-material",
     "mkdocs-git-revision-date-localized-plugin",
     "mkdocs-git-authors-plugin",
-    "mkdocs-glightbox"
+    "mkdocs-glightbox",
 ]
 
 [tool.hatch.build.targets.uav_data_generation]
