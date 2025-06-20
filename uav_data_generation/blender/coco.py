@@ -1,4 +1,6 @@
-from ..distributed import is_distributed, get_world_comm, get_rank  # noqa: F401 # isort:skip, this should be at the top
+import logging
+
+from ..distributed import is_distributed, get_world_comm, get_rank, is_main_process  # noqa: F401 # isort:skip, this should be at the top
 
 import datetime
 import json
@@ -36,6 +38,8 @@ class COCOWriter:
         self.category_counter = 1
         self.image_counter = 1
         self.annotation_counter = 1
+
+        self.logger = logging.getLogger()
 
     @staticmethod
     def get_image_format(
@@ -96,6 +100,7 @@ class COCOWriter:
         height: int,
     ) -> int:
         assert isinstance(file_name, str) and len(file_name) > 0
+        assert isinstance(width, int) and isinstance(height, int)
         assert width > 0 and height > 0, f"Invalid size, ({width}, {height})"
 
         id = self.image_counter
@@ -110,6 +115,7 @@ class COCOWriter:
         category_id: int,
         bboxes: list[tuple[int, int, int, int]],
     ) -> list[int]:
+        assert isinstance(image_id, int) and isinstance(category_id, int)
         assert image_id < self.image_counter, f"Unknown image_id {image_id}"
         assert any(category["id"] == category_id for category in self.categories), (
             f"Unknown category {category_id}"
@@ -121,6 +127,7 @@ class COCOWriter:
 
         ids = []
         for bbox in bboxes:
+            assert all(isinstance(val, int) for val in bbox), "Invalid bbox data type."
             x, y, w, h = bbox
             assert width >= x + w > x >= 0 and height >= y + h > y >= 0
 
@@ -135,6 +142,8 @@ class COCOWriter:
         comm = get_world_comm()
         rank = get_rank(comm)
 
+        self.logger.info("Gathering statistics...")
+
         # gather statistics for each rank
         statistics: list[tuple[int, int]]
         statistics = comm.allgather((len(self.images), len(self.annotations)))
@@ -144,6 +153,8 @@ class COCOWriter:
         for num_images, num_annos in statistics[:rank]:
             image_offset += num_images
             anno_offset += num_annos
+
+        self.logger.info("Gathering images and annotations...")
 
         # add the offset to id
         for image in self.images:
@@ -157,9 +168,10 @@ class COCOWriter:
 
         images = []
         annotations = []
-        for rank_images, rank_annotations in data:
-            images.extend(rank_images)
-            annotations.extend(rank_annotations)
+        if is_main_process():
+            for rank_images, rank_annotations in data:
+                images.extend(rank_images)
+                annotations.extend(rank_annotations)
         return images, annotations
 
     def export(self, path: Union[str, Path]):
@@ -168,14 +180,19 @@ class COCOWriter:
         else:
             images, annotations = self.images, self.annotations
 
-        self.coco["images"] = images
-        self.coco["annotations"] = annotations
+        if is_main_process():
+            self.coco["images"] = images
+            self.coco["annotations"] = annotations
 
-        if isinstance(path, str):
-            path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(self.coco, f)
+            if isinstance(path, str):
+                path = Path(path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(self.coco, f)
+
+            self.logger.info(
+                ":white_check_mark: Exported the COCO annotations successfully."
+            )
 
     def clear(self):
         self.image_counter = 1
