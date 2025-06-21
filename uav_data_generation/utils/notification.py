@@ -19,8 +19,8 @@ class EmailSettings:
     TITLE = "EMAIL_TITLE"
 
 
-def _load_env(env_file: str):
-    env_file = dotenv.find_dotenv(filename=env_file)
+def _load_env(env_file: str, usecwd: bool = False):
+    env_file = dotenv.find_dotenv(filename=env_file, usecwd=usecwd)
     env_vars = dotenv.dotenv_values(dotenv_path=env_file)
     return env_vars if len(env_vars) != 0 else None
 
@@ -54,9 +54,11 @@ def send_email(conn: smtplib.SMTP, content: str, env_vars: dict[str, str]):
         logger.exception(e)
 
 
-def notify(env_file: str = ".env", task_name: Optional[str] = None) -> Callable:
+def notify(
+    env_file: str = ".env", task_name: Optional[str] = None, usecwd: bool = False
+) -> Callable:
     def decorator(func: Callable) -> Callable:
-        env_vars = _load_env(env_file)
+        env_vars = _load_env(env_file, usecwd=usecwd)
         if env_vars is None:
             return func
         if not bool(int(env_vars["ENABLE_NOTIFICATION"])):
@@ -74,7 +76,7 @@ def notify(env_file: str = ".env", task_name: Optional[str] = None) -> Callable:
             begin = time.time()
             try:
                 return func(*args, **kwargs)
-            except:
+            except Exception:
                 is_failed = True
                 raise
             finally:
