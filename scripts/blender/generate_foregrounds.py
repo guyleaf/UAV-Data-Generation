@@ -305,7 +305,8 @@ def save_checkpoint(checkpoint: Checkpoint, out_file: Path, max_checkpoints: int
         os.remove(checkpoint_file)
 
 
-@notify()
+# Must use cwd because the exec env is in blender. It won't find the .env file.
+@notify(usecwd=True)
 def generate_foregrounds(
     config: BaseConfig,
     images_path: Union[str, Path],
