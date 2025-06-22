@@ -17,6 +17,9 @@ def randomize_drone_geometry(
 ):
     # the first entity is always the ancestor
     model = entities[0]
+    assert model.blender_obj.rotation_mode == "XYZ", (
+        "The rotation mode should be XYZ Euler."
+    )
 
     # randomly sample an euler angle
     euler = rand_rotation_euler(x_range, y_range, z_range)
