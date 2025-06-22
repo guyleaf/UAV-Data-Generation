@@ -13,9 +13,9 @@
     "source=${localEnv:HOME}/.ssh,target=/root/.ssh,type=bind,consistency=cached",
     "source=${localEnv:HOME}/.config/gh,target=/root/.config/gh,type=bind,consistency=cached",
     "source=${localEnv:HOME}/.gitconfig,target=/root/.gitconfig,type=bind,consistency=cached",
-    "source=${localEnv:HOME}/data,target=/data,type=bind,consistency=cached",
-    "source=${localEnv:HOME}/work,target=/work,type=bind,consistency=cached",
-    "source=${localEnv:HOME}/archive,target=/archive,type=bind,consistency=cached"
+    "source=${localEnv:HOME}/data,target=/root/data,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/work,target=/root/work,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/archive,target=/root/archive,type=bind,consistency=cached"
   ],
   "runArgs": ["--runtime=nvidia", "--gpus", "\"device=0,1,2,3\"", "--shm-size=1g"],
 
