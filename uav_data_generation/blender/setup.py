@@ -9,6 +9,31 @@ from ..logging import get_logger
 from .config import BaseConfig
 
 
+def load_blend(scene_path: str):
+    # note: only objects in the obj_types can be loaded
+    # otherwise, such as scene settings, they aren't loaded by blenderprc
+    objs = bproc.loader.load_blend(
+        scene_path,
+        obj_types=["mesh", "light", "empty", "camera"],
+        data_blocks=["objects", "materials"],
+    )
+    entities: list[Entity] = bproc.filter.all_with_type(objs, filtered_data_type=Entity)
+
+    # collect UAV models by custom property
+    uav_models: list[Entity] = bproc.filter.by_cp(entities, "UAV_model", True)
+    uav_models.sort(key=methodcaller("get_name"))
+
+    # organize entities for each uav model as dict
+    uav_model_dict: dict[str, list[Entity]] = {}
+    for model in uav_models:
+        uav_name = model.get_name()
+        uav_model_dict[uav_name] = [model] + sorted(
+            model.get_children(return_all_offspring=True), key=methodcaller("get_name")
+        )
+
+    return entities, uav_model_dict
+
+
 def setup(config: BaseConfig, device_type: str, devices: list[int]):
     logger = get_logger()
     bproc.init()
@@ -76,32 +101,14 @@ def setup(config: BaseConfig, device_type: str, devices: list[int]):
     logger.info(f"Loading the background: {config.background_path}")
     bproc.world.set_world_background_hdr_img(config.background_path)
 
-    # note: only objects in the obj_types can be loaded
-    # otherwise, such as scene settings, they aren't loaded by blenderprc
-    objs = bproc.loader.load_blend(
-        config.scene_path,
-        obj_types=["mesh", "light", "empty", "camera"],
-        data_blocks=["objects", "materials"],
-    )
-    entities: list[Entity] = bproc.filter.all_with_type(objs, filtered_data_type=Entity)
-
-    # collect UAV models by custom property
-    uav_models: list[Entity] = bproc.filter.by_cp(entities, "UAV_model", True)
-    uav_models.sort(key=methodcaller("get_name"))
-
-    # organize entities for each uav model as dict
-    uav_model_dict: dict[str, list[Entity]] = {}
-    for model in uav_models:
-        uav_name = model.get_name()
-        uav_model_dict[uav_name] = [model] + sorted(
-            model.get_children(return_all_offspring=True), key=methodcaller("get_name")
-        )
+    logger.info(f"Loading the scene: {config.scene_path}")
+    entities, uav_model_dict = load_blend(config.scene_path)
 
     if config.models is not None:
         uav_model_dict = {name: uav_model_dict[name] for name in config.models}
 
     assert len(uav_model_dict) > 0, "UAV model is not found."
-    logger.info(f"Find {len(uav_model_dict)} UAV models.")
+    logger.info(f"Find {len(uav_model_dict)} UAV models")
 
     # hide all objects by default
     for model in entities:
