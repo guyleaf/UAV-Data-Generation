@@ -37,7 +37,7 @@ def setup_email(env_vars: dict[str, str]):
     return smtp
 
 
-def send_email(conn: smtplib.SMTP, content: str, env_vars: dict[str, str]):
+def send_email(content: str, env_vars: dict[str, str]):
     sender = env_vars[EmailSettings.FROM]
     receivers = env_vars[EmailSettings.TO].split(",")
     title = env_vars[EmailSettings.TITLE]
@@ -47,11 +47,14 @@ def send_email(conn: smtplib.SMTP, content: str, env_vars: dict[str, str]):
     msg.set_content(content)
 
     logger = logging.get_logger()
-    try:
-        conn.send_message(msg, from_addr=sender, to_addrs=receivers)
-        logger.info(":white_check_mark: The notification is sended!")
-    except Exception as e:
-        logger.exception(e)
+
+    with setup_email(env_vars) as conn:
+        try:
+            conn.send_message(msg, from_addr=sender, to_addrs=receivers)
+            logger.info(":white_check_mark: The notification is sended!")
+        except Exception as e:
+            logger.error(":cross_mark: The notification is failed!")
+            logger.exception(e)
 
 
 def notify(
@@ -63,8 +66,6 @@ def notify(
             return func
         if not bool(int(env_vars["ENABLE_NOTIFICATION"])):
             return func
-
-        conn = setup_email(env_vars)
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -92,8 +93,7 @@ def notify(
                 content = f"{task_name} {content}"
 
                 logger.info(f":white_check_mark: {content}")
-                send_email(conn, content, env_vars)
-                conn.quit()
+                send_email(content, env_vars)
 
         return wrapper
 
