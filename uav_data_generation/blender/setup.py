@@ -18,19 +18,21 @@ def load_blend(scene_path: str):
         data_blocks=["objects", "materials"],
     )
     entities: list[Entity] = bproc.filter.all_with_type(objs, filtered_data_type=Entity)
+    # sort by the name at the beginning to keep the reproducibility
+    entities.sort(key=methodcaller("get_name"))
 
     # collect UAV models by custom property
     uav_models: list[Entity] = bproc.filter.by_cp(entities, "UAV_model", True)
-    uav_models.sort(key=methodcaller("get_name"))
 
     # organize entities for each uav model as dict
     uav_model_dict: dict[str, list[Entity]] = {}
     for model in uav_models:
         uav_name = model.get_name()
-        uav_model_dict[uav_name] = [model] + sorted(
-            model.get_children(return_all_offspring=True), key=methodcaller("get_name")
-        )
-
+        children = model.get_children(return_all_offspring=True)
+        children.sort(key=methodcaller("get_name"))
+        uav_model_dict[uav_name] = [model] + children
+    # TODO: Remove orphan data in entites
+    # entities and entites in uav_model_dict don't share the same instances.
     return entities, uav_model_dict
 
 
