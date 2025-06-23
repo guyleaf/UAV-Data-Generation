@@ -17,7 +17,12 @@
     "source=${localEnv:HOME}/work,target=/root/work,type=bind,consistency=cached",
     "source=${localEnv:HOME}/archive,target=/root/archive,type=bind,consistency=cached"
   ],
-  "runArgs": ["--runtime=nvidia", "--gpus", "\"device=0,1,2,3\"", "--shm-size=1g"],
+  "runArgs": [
+    "--runtime=nvidia",
+    "--gpus",
+    "\"device=0,1,2,3\"",
+    "--shm-size=1g"
+  ],
 
   // Use 'forwardPorts' to make a list of ports inside the container available locally.
   // "forwardPorts": [],
@@ -35,5 +40,7 @@
     "OMPI_ALLOW_RUN_AS_ROOT_CONFIRM": "1",
     // Allow using OPTIX in container
     "NVIDIA_DRIVER_CAPABILITIES": "graphics,compute,utility"
-  }
+  },
+  "workspaceMount": "source=${localWorkspaceFolder},target=/root/workspaces/${localWorkspaceFolderBasename},type=bind",
+  "workspaceFolder": "/root/workspaces/${localWorkspaceFolderBasename}"
 }

@@ -18,7 +18,7 @@ RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && /usr/sbin/locale-gen
 # SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Remove default vscode user
-RUN deluser vscode --remove-all-files
+# RUN deluser vscode --remove-all-files
 
 # Replace the apt mirror site
 RUN sed -i -e "s/http:\/\/deb\.debian\.org\/debian/http:\/\/debian\.csie\.ntu\.edu\.tw\/debian/" /etc/apt/sources.list
