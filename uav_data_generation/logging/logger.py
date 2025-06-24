@@ -20,17 +20,23 @@ def print_wrapper(*args, **kwargs) -> None:
 
 # TODO: better way to manage
 def configure_logger(level: int = logging.INFO):
+    console_width = os.getenv("CONSOLE_WIDTH")
+    if console_width is not None:
+        console_width = int(console_width)
+
     global _CONFIGURED
     if dist.is_distributed():
         rank = dist.get_rank()
         level = level if dist.is_main_process() else logging.ERROR
         format = f"[Rank {rank}]: {_FORMAT}"
         # in MPI env, the width of terminal cannot be detected correctly.
-        console = Console(width=int(os.getenv("CONSOLE_WIDTH", 200)))
+        if console_width is None:
+            console_width = 200
+        console = Console(width=console_width)
     else:
         level = level
         format = _FORMAT
-        console = Console()
+        console = Console(width=console_width)
 
     logging.basicConfig(
         level=level,
