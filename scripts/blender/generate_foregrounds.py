@@ -96,7 +96,7 @@ def parse_args():
     )
     parser.add_argument(
         "--distributed",
-        default=False,
+        default=bool(int(os.environ.get("DISTRIBUTED", "0"))),
         action=argparse.BooleanOptionalAction,
         help="Enable the distributed mode.",
     )
