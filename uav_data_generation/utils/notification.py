@@ -57,6 +57,26 @@ def send_email(content: str, env_vars: dict[str, str]):
             logger.exception(e)
 
 
+def send_success(
+    env_vars: dict[str, str], task_name: str, time_delta: time.struct_time
+):
+    ftime = time.strftime("%H:%M:%S", time_delta)
+    content = f"{task_name} is executed successfully after {ftime}."
+
+    logger = logging.get_logger()
+    logger.info(f":white_check_mark: {content}")
+    send_email(content, env_vars)
+
+
+def send_failed(env_vars: dict[str, str], task_name: str, time_delta: time.struct_time):
+    ftime = time.strftime("%H:%M:%S", time_delta)
+    content = f"{task_name} is executed unsuccessfully after {ftime}."
+
+    logger = logging.get_logger()
+    logger.info(f":cross_mark: {content}")
+    send_email(content, env_vars)
+
+
 def notify(
     env_file: str = ".env", task_name: Optional[str] = None, usecwd: bool = False
 ) -> Callable:
@@ -82,18 +102,15 @@ def notify(
                 raise
             finally:
                 delta = time.gmtime(time.time() - begin)
-                ftime = time.strftime("%H:%M:%S", delta)
 
-                # prepare content
-                state = "unsuccessfully" if is_failed else "successfully"
-                content = f"is executed {state} after {ftime}."
                 nonlocal task_name
                 if task_name is None:
                     task_name = f"{func.__name__}() in {__file__}"
-                content = f"{task_name} {content}"
 
-                logger.info(f":white_check_mark: {content}")
-                send_email(content, env_vars)
+                if is_failed:
+                    send_failed(env_vars, task_name, delta)
+                else:
+                    send_success(env_vars, task_name, delta)
 
         return wrapper
 
