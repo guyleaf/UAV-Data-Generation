@@ -38,12 +38,10 @@ def align_camera_pose(
     translate_axis(camera, "Z", z_offset)
 
     # align the camera view adaptively to fit the vertices in frame-1, frame, frame+1
-    if adaptive_alignment:
-        # if motion_blur is enabled, we also need to check the previous and next frame
-        frames = [frame]
-        if bpy.context.scene.render.use_motion_blur:
-            half_shutter = bpy.context.scene.render.motion_blur_shutter / 2
-            frames += [(frame - 1, 1 - half_shutter), (frame, half_shutter)]
+    # only works when motion_blur is True
+    if bpy.context.scene.render.use_motion_blur and adaptive_alignment:
+        half_shutter = bpy.context.scene.render.motion_blur_shutter / 2
+        frames = [(frame - 1, 1 - half_shutter), frame, (frame, half_shutter)]
 
         # check if all vertices of UAV are in the camera
         uav_meshes: list[MeshObject] = bproc.filter.all_with_type(
