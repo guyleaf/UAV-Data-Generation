@@ -12,7 +12,7 @@
 #SBATCH --mem=128G                                  # RAM per node
 
 #SBATCH --gpus=1                                    # (-G) Number of GPUs to run
-#SBATCH --gpus-per-node=1                           # GPUs per node
+#SBATCH --gpus-per-node=1                           # Number of GPUs per node
 
 #SBATCH -o %x_%j.log                                # output file (%j expands to jobId)
 #SBATCH -e %x_%j.err.log                            # output file (%j expands to jobId)
