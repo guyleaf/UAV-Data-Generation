@@ -189,6 +189,8 @@ pyrightconfig.json
 work_dirs/
 .*/
 !.vscode/
+!.github/
+!.devcontainer/
 output/
 outputs/
 wandb/

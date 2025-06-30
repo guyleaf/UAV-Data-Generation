@@ -7,6 +7,15 @@ from blenderproc.python.types.MaterialUtility import Material
 from .utils.geometry import rand_rotation_euler
 from .utils.material import group_and_filter_material_slots_by_cp
 
+ALLOWED_ROTATION_MODES = [
+    "XYZ",  # XYZ Euler.XYZ Rotation Order - prone to Gimbal Lock (default).
+    "XZY",  # XZY Euler.XZY Rotation Order - prone to Gimbal Lock.
+    "YXZ",  # YXZ Euler.YXZ Rotation Order - prone to Gimbal Lock.
+    "YZX",  # YZX Euler.YZX Rotation Order - prone to Gimbal Lock.
+    "ZXY",  # ZXY Euler.ZXY Rotation Order - prone to Gimbal Lock.
+    "ZYX",  # ZYX Euler.ZYX Rotation Order - prone to Gimbal Lock.
+]
+
 
 def randomize_drone_geometry(
     frame: int,
@@ -17,6 +26,9 @@ def randomize_drone_geometry(
 ):
     # the first entity is always the ancestor
     model = entities[0]
+    assert model.blender_obj.rotation_mode in ALLOWED_ROTATION_MODES, (
+        "The rotation mode should be in Euler."
+    )
 
     # randomly sample an euler angle
     euler = rand_rotation_euler(x_range, y_range, z_range)

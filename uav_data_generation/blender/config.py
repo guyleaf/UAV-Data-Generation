@@ -39,11 +39,11 @@ class BaseConfig(ABC):
     # The maximum number of UAVs per image.
     sample_range: tuple[int, int] = (1, 20)
 
-    # Enable adaptive alignment with the step (useful with motion blur).
+    # Enable adaptive alignment with the step (only works when motion_blur is True).
     adaptive_alignment: bool = True
-    # Align the camera with the UAV and move backward with the offset (m) (useful with motion blur).
+    # Align the camera with the UAV and move backward with the offset (m).
     alignment_z_offset: float = 0
-    # Increase the alignment distance with the step (m) (--adaptive-alignment only).
+    # Increase the alignment distance with the step (m) (adaptive-alignment only).
     alignment_z_step: float = 1e-3
 
     # The maximum IoF among UAVs in image. (max_uavs_iof > 0 -> accept occlusion)

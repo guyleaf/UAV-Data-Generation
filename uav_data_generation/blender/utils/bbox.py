@@ -24,8 +24,10 @@ def find_overlap_bbox(
     if not isinstance(bbox2, np.ndarray):
         bbox2 = np.array(bbox2)
 
-    bbox1 = bboxes_xywh_to_xyxy(bbox1[None, :])[0]
-    bbox2 = bboxes_xywh_to_xyxy(bbox2[None, :])[0]
+    bbox1 = bboxes_xywh_to_xyxy(bbox1[None, :])
+    bbox2 = bboxes_xywh_to_xyxy(bbox2[None, :])
+    bbox1 = bbox1[0].tolist()
+    bbox2 = bbox2[0].tolist()
 
     x_start = max(bbox1[0], bbox2[0])
     y_start = max(bbox1[1], bbox2[1])

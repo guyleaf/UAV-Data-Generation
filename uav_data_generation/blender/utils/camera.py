@@ -1,4 +1,5 @@
-from typing import Union
+from itertools import chain
+from typing import Iterable, Union
 
 import bpy
 import numpy as np
@@ -22,7 +23,7 @@ def is_vertex_in_camera_view(vertex: Union[np.ndarray, Vector]) -> bool:
     )
 
 
-def is_vertices_in_camera_view(vertices: Union[np.ndarray, list[Vector]]) -> bool:
+def are_vertices_in_camera_view(vertices: Iterable[Union[np.ndarray, Vector]]) -> bool:
     return all(map(is_vertex_in_camera_view, vertices))
 
 
@@ -36,7 +37,7 @@ def are_all_meshes_in_camera_view(
             frame, subframe = frame, 0
 
         with Frame(frame, subframe=subframe):
-            for mesh in meshes:
-                if not is_vertices_in_camera_view(mesh.get_bound_box()):
-                    return False
+            vertices = chain.from_iterable(mesh.get_bound_box() for mesh in meshes)
+            if not are_vertices_in_camera_view(vertices):
+                return False
     return True

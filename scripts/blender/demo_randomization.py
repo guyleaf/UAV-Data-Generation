@@ -10,7 +10,6 @@ from blenderproc.python.types.MeshObjectUtility import MeshObject
 from mathutils import Euler, Vector
 from PIL import Image
 from rich import print
-
 from uav_data_generation.blender.camera import align_camera_pose
 from uav_data_generation.blender.config import BaseConfig
 from uav_data_generation.blender.drone import randomize_drone_properties
@@ -95,7 +94,6 @@ def demo_randomization(
     camera = bpy.context.scene.camera
     camera.location = Vector((0, -1, 0))
     camera.rotation_euler = Euler((radians(90), 0, 0))
-    bpy.context.view_layer.update()
 
     original_action_keys = bpy.data.actions.keys()
     for name, uav_entities in uav_models.items():

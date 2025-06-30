@@ -5,6 +5,7 @@ import bpy  # noqa: F401 # isort:skip
 from blenderproc.python.types.EntityUtility import Entity
 from blenderproc.python.types.MeshObjectUtility import MeshObject
 
+from ..logging import get_logger
 from .frame import Frame
 from .utils.camera import are_all_meshes_in_camera_view
 from .utils.geometry import translate_axis
@@ -18,6 +19,7 @@ def align_camera_pose(
     alignment_z_offset: float = 0,
     alignment_z_step: float = 0.1,
 ):
+    logger = get_logger()
     camera = bpy.context.scene.camera
 
     # select the current model
@@ -36,12 +38,10 @@ def align_camera_pose(
     translate_axis(camera, "Z", z_offset)
 
     # align the camera view adaptively to fit the vertices in frame-1, frame, frame+1
-    if adaptive_alignment:
-        # if motion_blur is enabled, we also need to check the previous and next frame
-        frames = [frame]
-        if bpy.context.scene.render.use_motion_blur:
-            half_shutter = bpy.context.scene.render.motion_blur_shutter / 2
-            frames += [(frame - 1, 1 - half_shutter), (frame, half_shutter)]
+    # only works when motion_blur is True
+    if bpy.context.scene.render.use_motion_blur and adaptive_alignment:
+        half_shutter = bpy.context.scene.render.motion_blur_shutter / 2
+        frames = [(frame - 1, 1 - half_shutter), frame, (frame, half_shutter)]
 
         # check if all vertices of UAV are in the camera
         uav_meshes: list[MeshObject] = bproc.filter.all_with_type(
@@ -50,7 +50,9 @@ def align_camera_pose(
         while not are_all_meshes_in_camera_view(uav_meshes, frames):
             z_offset += alignment_z_step
             translate_axis(camera, "Z", alignment_z_step)
-        print(f"[Adaptive alignment] Retrying to move backward... {z_offset:.3f}m")
+        logger.info(
+            f"[Adaptive alignment] Retrying to move backward... {z_offset:.3f}m"
+        )
 
     # set the camera pose
     matrix_world = bproc.camera.get_camera_pose()

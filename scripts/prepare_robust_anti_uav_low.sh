@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eu
 
-root="$HOME/data/Weather"
+root="$HOME/data/Background"
 bash "$(dirname "$0")/datasets/prepare_image2weather.sh" "$root"
 
 out="$HOME/data/UAV/Robust_Anti_UAV_Low"

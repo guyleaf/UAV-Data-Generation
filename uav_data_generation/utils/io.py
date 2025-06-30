@@ -47,9 +47,9 @@ def collect_images_from_images(
             if path.exists():
                 break
         else:
-            assert (
-                False
-            ), f"The corresponding background image is not found, {rel_path}."
+            raise RuntimeError(
+                f"The corresponding background image is not found, {rel_path}."
+            )
 
         paths.append(path)
     return paths
