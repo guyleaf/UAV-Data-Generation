@@ -37,7 +37,7 @@ dev = [
     "transformers < 5",
     "safetensors",
     "packaging",
-    "torch ~= 2.4.1",
+    "torch ~= 2.8.0",
     "torchvision ~= 0.19.1",
     "opencv-python < 5",
     "diffusers[torch] < 5",
