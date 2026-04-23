@@ -12,8 +12,8 @@
 #SBATCH --gpus=8                                    # (-G) Number of GPUs to run
 #SBATCH --gpus-per-node=8                           # Number of GPUs per node
 
-#SBATCH -o %x_%j_rank_%t.log                        # output file (%j expands to jobId)
-#SBATCH -e %x_%j_rank_%t.err.log                    # output file (%j expands to jobId)
+#SBATCH -o %x_%j_node_%n.log                        # output file (%j expands to jobId)
+#SBATCH -e %x_%j_node_%n.err.log                    # output file (%j expands to jobId)
 #SBATCH --mail-type=END,FAIL                        # Mail events (NONE, BEGIN, END, FAIL, ALL)
 #SBATCH --mail-user=leaf.ying.cs11@nycu.edu.tw      # Where to send mail.  Set this to your email address
 
