@@ -6,6 +6,7 @@ import PIL.ImageDraw as ImageDraw
 import PIL.ImageFont as ImageFont
 from matplotlib import font_manager
 from pycocotools.coco import COCO
+from rich.progress import track
 
 ANNOTATION_SEARCH_PATTERN = "*.json"
 
@@ -55,6 +56,13 @@ def _validate_annotation_areas(coco: COCO):
     )
 
 
+def _validate_imgs(coco: COCO, images_path: Path):
+    for img in track(coco.dataset["images"], description="Checking images..."):
+        img_shape = (img["width"], img["height"])
+        with Image.open(images_path / img["file_name"]) as f:
+            assert img_shape == f.size
+
+
 def _draw_bounding_box(image: Image.Image, coord: tuple[int, int, int, int]):
     x, y, w, h = coord
 
@@ -100,6 +108,7 @@ def validate_coco_dataset(
         coco = COCO(annotation_file)
         _validate_ids(coco)
         _validate_annotation_areas(coco)
+        _validate_imgs(coco, images_path)
         if show:
             _show_annotations(coco, images_path, num_annotations=show_num_images)
 
