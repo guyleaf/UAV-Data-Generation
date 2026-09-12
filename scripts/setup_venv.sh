@@ -6,7 +6,7 @@ python3 -m venv .venv
 source ".venv/bin/activate"
 
 pip install -U pip
-pip install --extra-index-url https://download.pytorch.org/whl/cu121 -e .[dev]
+pip install --extra-index-url https://download.pytorch.org/whl/cu121 --extra-index-url https://download.blender.org/pypi/ -e .[dev]
 blenderproc pip install .
 
 # execute a dummy script to run the blenderproc setup
