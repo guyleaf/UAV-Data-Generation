@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "uav_data_generation"
-authors = [{ name = "Leaf Ying", email = "leaf.ying.cs11@nycu.edu.tw" }]
+authors = [{ name = "Leaf Ying", email = "leaf.ying.work@gmail.com" }]
 readme = "README.md"
 requires-python = ">=3.10"
 version = "0.1.0"
@@ -56,5 +56,8 @@ dev = [
     "mkdocs-glightbox",
 ]
 
-[tool.hatch.build.targets.uav_data_generation]
-only-include = ["uav_data_generation"]
+[tool.hatch.build.targets.wheel]
+only-packages = true
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "NPY201"]
