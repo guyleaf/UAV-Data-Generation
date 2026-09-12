@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/devcontainers/python:1-3.10-bullseye
+FROM mcr.microsoft.com/devcontainers/python:3-3.10-bookworm
 HEALTHCHECK NONE
 
 ARG PERSISTENCE_DIR="/persistence"
@@ -21,19 +21,19 @@ RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && /usr/sbin/locale-gen
 # RUN deluser vscode --remove-all-files
 
 # Replace the apt mirror site
-RUN sed -i -e "s/http:\/\/deb\.debian\.org\/debian/http:\/\/debian\.csie\.ntu\.edu\.tw\/debian/" /etc/apt/sources.list
+RUN sed -i -e "s/http:\/\/deb\.debian\.org\/debian/http:\/\/debian\.csie\.ntu\.edu\.tw\/debian/" /etc/apt/sources.list.d/debian.sources
 
 RUN apt-get update && apt-get -y upgrade \
     && apt-get -y install --no-install-recommends man manpages \
     && apt-get -y install --no-install-recommends git-lfs openmpi-bin openmpi-common openmpi-doc libopenmpi-dev bc \
     && apt-get -y install libxxf86vm1 libx11-6 libxi6 libxrandr2 libxcursor1 libgl1 libxinerama1 libxkbcommon0 libsm6 \
-    && apt-get -y install --no-install-recommends tmux \
+    && apt-get -y install --no-install-recommends tmux hyperfine \
     && apt-get -y install --no-install-recommends --reinstall bash-completion \
     && apt-get autoremove -y \
     && apt-get clean -y \
     && rm -rf /var/lib/apt/lists/*
 
-# Install nvitop for monitoring GPU
+# Install extra tools for dev
 RUN python3 -m pip install --no-cache-dir -U nvitop
 
 # Persist bash history and others

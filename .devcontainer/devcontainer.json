@@ -20,6 +20,7 @@
   "runArgs": [
     "--runtime=nvidia",
     "--gpus",
+    // "all",
     "\"device=0,1,2,3\"",
     "--shm-size=1g"
   ],
@@ -42,5 +43,6 @@
     "NVIDIA_DRIVER_CAPABILITIES": "graphics,compute,utility"
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/root/workspaces/${localWorkspaceFolderBasename},type=bind",
-  "workspaceFolder": "/root/workspaces/${localWorkspaceFolderBasename}"
+  "workspaceFolder": "/root/workspaces/${localWorkspaceFolderBasename}",
+  "shutdownAction": "none"
 }
