@@ -2,6 +2,7 @@ import os
 from typing import Optional
 
 from rich import print
+
 from uav_data_generation.blender.config import AREA_RANGES, BaseConfig
 
 
