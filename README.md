@@ -1,5 +1,6 @@
 # UAV-Data-Generation
 WIP
+My Thesis: https://hdl.handle.net/20.500.14371/90554
 
 ## TODOs
 - [x] Support distributed generation
