@@ -1,7 +1,8 @@
 # UAV-Data-Generation
+WIP
 
 ## TODOs
-- [ ] Support distributed generation
+- [x] Support distributed generation
 - [ ] Use high-quality dataset
   - Support several backgrounds (e.g. urban, landscape, sky, etc.)
 
