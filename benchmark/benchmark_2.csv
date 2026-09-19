@@ -1,2 +1,0 @@
-command,mean,stddev,median,user,system,min,max,parameter_procs
-bash scripts/mpiexec.sh scripts/blender/generate_uav_samples_demo.sh $((2**3)),4349.162766860133,35.095492563775345,4336.3012018828,85669.30092027999,23762.122294386663,4322.3124930548,4388.8746056428,3
