@@ -1,4 +1,4 @@
-# Benchmark
+# Blender Benchmark
 ## Hardware
 - CPU: Intel(R) Xeon(R) Silver 4210R CPU @ 2.40GHz * 2
 - RAM: Samsung 64GB DDR4-3200 RDIMM ECC Registered * 6
