@@ -1,4 +1,4 @@
-# Blender Benchmark
+# UAV Foreground Generation Benchmark
 ## Hardware
 - CPU: Intel(R) Xeon(R) Silver 4210R CPU @ 2.40GHz * 2
 - RAM: Samsung 64GB DDR4-3200 RDIMM ECC Registered * 6
@@ -9,6 +9,7 @@
 - Host OS: Ubuntu 22.04.1
 - Rootless Container OS: Debian bookworm
 - OpenMPI: 4.1.4
+- Blender: 3.5.1
 
 ## Config
 [robust_anti_uav_demo.py](../configs/robust_anti_uav_demo.py)
